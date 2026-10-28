@@ -1,0 +1,11 @@
+{
+  "description": "CloudLearn is a cloud-based e-learning platform for hybrid learning with role-based dashboards for students, instructors and administrators.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  },
+  "title": "CloudLearn | Cloud-Based E-Learning Platform"
+}

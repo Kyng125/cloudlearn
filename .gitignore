@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+.env
+backend/data/*.db
+backend/uploads/
+tests/e2e/shots/
