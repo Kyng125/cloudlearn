@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS courses (
   description TEXT NOT NULL DEFAULT '',
   instructor_id TEXT NOT NULL REFERENCES users(id),
   category TEXT NOT NULL DEFAULT '',
-  level TEXT NOT NULL DEFAULT 'beginner',
+  level TEXT NOT NULL DEFAULT 'Beginner' CHECK (level IN ('Beginner','Intermediate','Advanced')),
   thumbnail TEXT NOT NULL DEFAULT '',
   is_published INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS lessons (
   id TEXT PRIMARY KEY,
   module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  type TEXT NOT NULL DEFAULT 'text' CHECK (type IN ('video','text','pdf','quiz')),
+  type TEXT NOT NULL DEFAULT 'document' CHECK (type IN ('video','document','presentation')),
   content TEXT NOT NULL DEFAULT '',
   duration_minutes INTEGER NOT NULL DEFAULT 0,
   position INTEGER NOT NULL DEFAULT 0
@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   id TEXT PRIMARY KEY,
   assignment_id TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
   student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL DEFAULT '',
   file_name TEXT NOT NULL,
   stored_name TEXT NOT NULL,
   submitted_at TEXT NOT NULL,
@@ -122,6 +123,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
   id TEXT PRIMARY KEY,
   course_id TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
   duration_minutes INTEGER NOT NULL DEFAULT 15,
   passing_score INTEGER NOT NULL DEFAULT 50,
   is_exam INTEGER NOT NULL DEFAULT 0,

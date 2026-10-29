@@ -29,19 +29,19 @@ function seed(db, { rounds = 10, password = 'demo123' } = {}) {
     const module_ = db.prepare('INSERT INTO modules (id,course_id,title,position) VALUES (?,?,?,?)');
     const lesson = db.prepare('INSERT INTO lessons (id,module_id,title,type,content,duration_minutes,position) VALUES (?,?,?,?,?,?,?)');
     const courses = [
-      ['c1', 'Programming Fundamentals with Python', 'Variables, control flow, functions and data structures.', 'u_ins1', 'Programming', 'beginner', 1, [
+      ['c1', 'Programming Fundamentals with Python', 'Variables, control flow, functions and data structures.', 'u_ins1', 'Programming', 'Beginner', 1, [
         ['Getting Started', ['Installing Python and your first program', 'Variables and data types']],
         ['Control Flow and Functions', ['Conditionals and loops', 'Writing functions']]]],
-      ['c2', 'Database Systems and SQL', 'Relational modelling, normalisation and SQL queries.', 'u_ins1', 'Databases', 'intermediate', 1, [
+      ['c2', 'Database Systems and SQL', 'Relational modelling, normalisation and SQL queries.', 'u_ins1', 'Databases', 'Intermediate', 1, [
         ['Relational Basics', ['Entities, keys and relationships', 'Normalisation']],
         ['Querying', ['SELECT, WHERE and JOIN', 'Aggregation and grouping']]]],
-      ['c3', 'Web Development Essentials', 'HTML, CSS and JavaScript for building responsive pages.', 'u_ins2', 'Web', 'beginner', 1, [
+      ['c3', 'Web Development Essentials', 'HTML, CSS and JavaScript for building responsive pages.', 'u_ins2', 'Web', 'Beginner', 1, [
         ['Markup and Style', ['HTML structure', 'CSS layout']],
         ['Interactivity', ['JavaScript basics', 'Working with the DOM']]]],
-      ['c4', 'Computer Networks and Cloud Concepts', 'Network models, protocols and cloud service models.', 'u_ins2', 'Networking', 'intermediate', 1, [
+      ['c4', 'Computer Networks and Cloud Concepts', 'Network models, protocols and cloud service models.', 'u_ins2', 'Networking', 'Intermediate', 1, [
         ['Networking Foundations', ['OSI and TCP/IP models', 'IP addressing']],
         ['Cloud Computing', ['IaaS, PaaS and SaaS', 'Deployment models']]]],
-      ['c5', 'Operating Systems Concepts', 'Processes, memory management and file systems (draft).', 'u_ins2', 'Systems', 'intermediate', 0, [
+      ['c5', 'Operating Systems Concepts', 'Processes, memory management and file systems (draft).', 'u_ins2', 'Systems', 'Intermediate', 0, [
         ['Processes', ['Process lifecycle', 'Scheduling']]]],
     ];
     courses.forEach(([id, title, desc, ins, cat, lvl, pub, mods], ci) => {
@@ -49,7 +49,7 @@ function seed(db, { rounds = 10, password = 'demo123' } = {}) {
       mods.forEach(([mt, ls], mi) => {
         const mid = `${id}_m${mi + 1}`;
         module_.run(mid, id, mt, mi);
-        ls.forEach((lt, li) => lesson.run(`${mid}_l${li + 1}`, mid, lt, li % 2 ? 'text' : 'video', `Notes for: ${lt}`, 10 + li * 5, li));
+        ls.forEach((lt, li) => lesson.run(`${mid}_l${li + 1}`, mid, lt, li % 2 ? 'document' : 'video', `Notes for: ${lt}`, 10 + li * 5, li));
       });
     });
 
@@ -67,9 +67,9 @@ function seed(db, { rounds = 10, password = 'demo123' } = {}) {
     asg.run('a3', 'c2', 'ER Diagram and Schema', 'Model a library system and write its CREATE TABLE statements.', at(9), 100, at(-2));
     asg.run('a4', 'c3', 'Personal Portfolio Page', 'Build a responsive one-page portfolio with HTML and CSS.', at(3), 100, at(-5));
 
-    const sub = db.prepare('INSERT INTO submissions (id,assignment_id,student_id,file_name,stored_name,submitted_at,is_late) VALUES (?,?,?,?,?,?,?)');
-    sub.run('s1', 'a1', 'u_stu1', 'functions_project.py', 'seed-placeholder', at(-8), 0);
-    sub.run('s2', 'a1', 'u_stu2', 'functions_chidi.py', 'seed-placeholder', at(-6), 1);
+    const sub = db.prepare('INSERT INTO submissions (id,assignment_id,student_id,content,file_name,stored_name,submitted_at,is_late) VALUES (?,?,?,?,?,?,?,?)');
+    sub.run('s1', 'a1', 'u_stu1', '', 'functions_project.py', 'seed-placeholder', at(-8), 0);
+    sub.run('s2', 'a1', 'u_stu2', '', 'functions_chidi.py', 'seed-placeholder', at(-6), 1);
     db.prepare('INSERT INTO grades (submission_id,score,feedback,graded_by,graded_at) VALUES (?,?,?,?,?)')
       .run('s1', 88, 'Good use of functions. Add input validation next time.', 'u_ins1', at(-5));
 

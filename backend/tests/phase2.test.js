@@ -171,7 +171,8 @@ test('TC03: malformed JSON and unknown routes return clean errors without stack 
   const s = await start(); const c = new Client(s.base);
   const bad = await c.req('POST', '/api/auth/login', '{not json');
   assert.equal(bad.status, 400); assert.ok(!/at .*\.js/.test(bad.text));
-  assert.equal((await c.get('/api/nope')).status, 404);
+  assert.equal((await c.get('/api/nope')).status, 401);                    // anonymous callers cannot probe for routes
+  assert.equal((await (await as(s.base, 'student')).get('/api/nope')).status, 404);
   await s.close();
 });
 

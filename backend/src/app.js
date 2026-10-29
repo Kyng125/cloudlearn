@@ -3,10 +3,15 @@ const path = require('path');
 const express = require('express');
 const { makeAuth, publicUser, COOKIE, sha256, parseCookies } = require('./auth');
 const { newId, now } = require('./db');
+const { makeAccess } = require('./access');
+const { makeUploads } = require('./uploads');
+const { academicRoutes } = require('./academic');
+const { assessmentRoutes } = require('./assessment');
 
 const DEFAULTS = {
   bcryptRounds: 10, sessionDays: 7, cookieSecure: false,
   throttleMax: 5, throttleIpMax: 20, throttleWindowMin: 15,
+  uploadDir: path.join(__dirname, '..', 'uploads'), maxUploadBytes: 10 * 1024 * 1024, quizGraceSec: 5,
   trustProxy: false, staticDir: path.join(__dirname, '..', '..', 'frontend', 'dist'),
 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -208,6 +213,10 @@ function createApp(db, overrides = {}) {
   });
 
   api.use('/admin', admin);
+  const uploads = makeUploads(config);
+  const access = makeAccess(db);
+  api.use(academicRoutes({ db, auth, access, uploads }));
+  api.use(assessmentRoutes({ db, auth, access, uploads, config }));
   api.use((_req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);
 
@@ -220,6 +229,9 @@ function createApp(db, overrides = {}) {
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Malformed JSON' });
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File is too large' });
+    if (err.name === 'MulterError') return res.status(400).json({ error: 'Invalid upload' });
+    if (err.status === 400) return res.status(400).json({ error: err.message });
     if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Request too large' });
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

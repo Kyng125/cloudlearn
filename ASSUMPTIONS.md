@@ -9,3 +9,6 @@
 - A8 Seed dates remain 2024 until the Phase 2 seed script uses relative dates.
 - A9 Throttle limits (5/15 min per email+IP, 20 per IP) and 7-day sessions are defaults, not requirements.
 - A10 Demo seed uses the shared password `demo123`; the seed script refuses to run in production without `--force-production`.
+- A11 Exams are single-attempt; ordinary quizzes allow unlimited retakes (not stated in the report).
+- A12 Allowed upload types are documents, images, archives and common source files; max 10 MB. Owner may adjust.
+- A13 Quiz questions cannot be edited after creation in this phase (create, publish, unpublish, delete-if-unattempted only).

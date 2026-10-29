@@ -10,3 +10,6 @@ Items where the seminar report and the build diverge. Apply after the owner rele
 8. Table count: the build has 20 tables (the report's six plus sessions and login_attempts for authentication, and the academic/communication tables).
 9. Account creation: self-registration creates students only; instructors are created by an administrator (pending D12).
 10. Authentication detail to state accurately: bcrypt-hashed passwords, httpOnly session cookie, persistent login throttle, role-based access checks on the server.
+11. FR5/FR7: uploads are stored on the application server's disk (not object storage) with a type allow-list and size limit.
+12. FR9: quiz scoring and timing are enforced on the server; answers are saved progressively; the report's wording about client-side scoring, if any, should be corrected.
+13. Late-submission logic (Figure 3.5) is implemented against the server clock.

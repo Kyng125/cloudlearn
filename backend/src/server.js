@@ -5,7 +5,9 @@ const { createApp } = require('./app');
 const prod = process.env.NODE_ENV === 'production';
 const dbFile = process.env.DB_FILE || path.join(__dirname, '..', 'data', 'cloudlearn.db');
 const db = openDb(dbFile);
+const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 const app = createApp(db, {
+  uploadDir,
   cookieSecure: prod,
   trustProxy: prod,
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 10,
