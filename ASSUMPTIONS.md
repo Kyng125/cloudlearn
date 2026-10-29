@@ -5,5 +5,7 @@
 - A4 Uploads on local disk behind authenticated routes.
 - A5 Must run on Windows and move between laptops.
 - A6 HND CS course names in the re-skin are placeholders; owner may supply the real module list.
-- A7 New-user temporary password in admin Add User is `welcome123` (prototype only; replaced by a server-generated reset flow in Phase 2).
+- A7 (superseded by D16) prototype temporary password `welcome123`.
 - A8 Seed dates remain 2024 until the Phase 2 seed script uses relative dates.
+- A9 Throttle limits (5/15 min per email+IP, 20 per IP) and 7-day sessions are defaults, not requirements.
+- A10 Demo seed uses the shared password `demo123`; the seed script refuses to run in production without `--force-production`.

@@ -4,7 +4,7 @@ Cloud-based e-learning platform for hybrid learning. Case study for the Departme
 
 ## Layout
 - `frontend/`  React 19 + Vite + Tailwind 4 + Recharts (from Figma Make, repaired in Phase 1)
-- `backend/`   Node + Express + SQLite (Phase 2 onward; empty now)
+- `backend/`   Node + Express + SQLite: auth, roles, admin user management (Phase 2)
 - `tests/e2e/` Playwright regression scripts
 - `BUILD-PLAN.md` phased plan; `DECISIONS.md`, `ASSUMPTIONS.md`, `TODO.md`, `REPORT-CHANGES.md` project state
 
@@ -17,7 +17,17 @@ npm run dev
 Demo logins (password `demo123`): student@ / instructor@ / admin@cloudlearn.com
 
 ## Status
-Phase 1 (front-end integrity) complete pending owner approval. No backend yet: data lives in the browser.
+Phase 1 and 2 complete. The front end still uses localStorage; it is connected to the API in Phase 5.
+
+## Backend
+```
+cd backend
+npm install
+npm run seed      # demo data (dev only)
+npm start         # http://localhost:3000, serves frontend/dist if built
+npm test          # node:test suite
+```
+Env: `PORT`, `DB_FILE`, `BCRYPT_ROUNDS`, `NODE_ENV=production` (secure cookies, trust proxy).
 
 ## Regression test
 ```

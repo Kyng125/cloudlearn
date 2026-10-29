@@ -7,3 +7,6 @@ Items where the seminar report and the build diverge. Apply after the owner rele
 5. Backup: database file backup/restore, not cloud snapshotting.
 6. Enrolment is student-only.
 7. Evaluation (Chapter 4): results come from Phase 6 tooling, not from the Figma prototype.
+8. Table count: the build has 20 tables (the report's six plus sessions and login_attempts for authentication, and the academic/communication tables).
+9. Account creation: self-registration creates students only; instructors are created by an administrator (pending D12).
+10. Authentication detail to state accurately: bcrypt-hashed passwords, httpOnly session cookie, persistent login throttle, role-based access checks on the server.
