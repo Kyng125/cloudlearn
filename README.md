@@ -17,7 +17,7 @@ npm run dev
 Demo logins (password `demo123`): student@ / instructor@ / admin@cloudlearn.com
 
 ## Status
-Phases 1 to 3 complete (front end repaired, backend auth/roles, academic API). The front end still uses localStorage; it is connected to the API in Phase 5.
+Phases 1 to 4 complete (front end repaired, backend auth/roles, academic API, communication/reports/backup). The front end still uses localStorage; it is connected to the API in Phase 5.
 
 ## Backend
 ```
@@ -27,7 +27,7 @@ npm run seed      # demo data (dev only)
 npm start         # http://localhost:3000, serves frontend/dist if built
 npm test          # node:test suite
 ```
-Uploaded files go to `backend/uploads/` (git-ignored). Env: `PORT`, `DB_FILE`, `UPLOAD_DIR` (optional), `BCRYPT_ROUNDS`, `NODE_ENV=production` (secure cookies, trust proxy).
+Uploaded files go to `backend/uploads/` (git-ignored). Env: `PORT`, `DB_FILE`, `UPLOAD_DIR` and `BACKUP_DIR` (optional), `BCRYPT_ROUNDS`, `NODE_ENV=production` (secure cookies, trust proxy).
 
 ## Regression test
 ```

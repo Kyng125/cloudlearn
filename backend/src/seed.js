@@ -103,7 +103,7 @@ function seed(db, { rounds = 10, password = 'demo123' } = {}) {
     const note = db.prepare('INSERT INTO notifications (id,user_id,type,title,body,created_at) VALUES (?,?,?,?,?,?)');
     note.run('n1', 'u_stu1', 'grade', 'Assignment graded', 'Your "Python Functions Project" scored 88/100.', at(-5));
     note.run('n2', 'u_stu1', 'assignment', 'New assignment', '"ER Diagram and Schema" was posted in Database Systems and SQL.', at(-2));
-    note.run('n3', 'u_ins1', 'submission', 'New submission', 'Chidi Okafor submitted "Python Functions Project" (late).', at(-6));
+    note.run('n3', 'u_ins1', 'assignment', 'New submission', 'Chidi Okafor submitted "Python Functions Project" (late).', at(-6));
   });
   run();
 }

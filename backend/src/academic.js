@@ -42,6 +42,7 @@ function academicRoutes({ db, auth, access, uploads }) {
     const id = newId('c');
     db.prepare('INSERT INTO courses (id,title,description,instructor_id,category,level,thumbnail,is_published,created_at) VALUES (?,?,?,?,?,?,?,0,?)')
       .run(id, title, str(b.description, 4000), instructorId, str(b.category, 60), level, str(b.thumbnail, 500), now());
+    req.log('Created course', title);
     res.status(201).json({ course: courseOut(course(id), { modules: true, content: true }) });
   });
 
@@ -58,6 +59,7 @@ function academicRoutes({ db, auth, access, uploads }) {
       b.title === undefined ? c.title : str(b.title, 150), b.description === undefined ? c.description : str(b.description, 4000),
       b.category === undefined ? c.category : str(b.category, 60), b.level === undefined ? c.level : b.level,
       b.thumbnail === undefined ? c.thumbnail : str(b.thumbnail, 500), b.isPublished === undefined ? c.is_published : (b.isPublished ? 1 : 0), c.id);
+    if (b.isPublished !== undefined && b.isPublished !== !!c.is_published) req.log(b.isPublished ? 'Published course' : 'Unpublished course', c.title);
     res.json({ course: courseOut(course(c.id), { modules: true, content: true }) });
   });
 
@@ -68,6 +70,7 @@ function academicRoutes({ db, auth, access, uploads }) {
     const files = db.prepare('SELECT stored_name FROM materials WHERE course_id=?').all(req.course.id);
     db.prepare('DELETE FROM courses WHERE id=?').run(req.course.id);
     files.forEach((f) => uploads.remove(f.stored_name));
+    req.log('Deleted course', req.course.title);
     res.json({ ok: true });
   });
 
@@ -139,6 +142,7 @@ function academicRoutes({ db, auth, access, uploads }) {
       db.prepare('INSERT INTO materials (id,course_id,uploaded_by,file_name,stored_name,mime_type,size_bytes,created_at) VALUES (?,?,?,?,?,?,?,?)')
         .run(id, req.course.id, req.user.id, uploads.cleanName(req.file.originalname), req.file.filename, req.file.mimetype || 'application/octet-stream', req.file.size, now());
     } catch (e) { uploads.remove(req.file.filename); throw e; } // never leave an orphan file behind a failed record
+    req.log('Uploaded material', `${uploads.cleanName(req.file.originalname)} to ${req.course.title}`);
     res.status(201).json({ material: materialOut(db.prepare('SELECT * FROM materials WHERE id=?').get(id)) });
   });
 
@@ -179,7 +183,8 @@ function academicRoutes({ db, auth, access, uploads }) {
     if (isEnrolled(req.user.id, c.id)) return res.status(409).json({ error: 'You are already enrolled in this course' });
     const id = newId('e');
     db.prepare('INSERT INTO enrollments (id,student_id,course_id,enrolled_at) VALUES (?,?,?,?)').run(id, req.user.id, c.id, now());
-    notify(c.instructor_id, 'enrollment', 'New enrolment', `${cname(req.user)} enrolled in ${c.title}.`);
+    notify(c.instructor_id, 'course', 'New enrolment', `${cname(req.user)} enrolled in ${c.title}.`);
+    req.log('Enrolled in course', c.title);
     res.status(201).json({ enrollment: enrolmentOut(db.prepare('SELECT * FROM enrollments WHERE id=?').get(id)) });
   });
 

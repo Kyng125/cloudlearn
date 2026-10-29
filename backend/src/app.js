@@ -7,11 +7,14 @@ const { makeAccess } = require('./access');
 const { makeUploads } = require('./uploads');
 const { academicRoutes } = require('./academic');
 const { assessmentRoutes } = require('./assessment');
+const { communicationRoutes } = require('./communication');
+const { reportRoutes } = require('./reports');
+const { backupRoutes } = require('./backups');
 
 const DEFAULTS = {
   bcryptRounds: 10, sessionDays: 7, cookieSecure: false,
   throttleMax: 5, throttleIpMax: 20, throttleWindowMin: 15,
-  uploadDir: path.join(__dirname, '..', 'uploads'), maxUploadBytes: 10 * 1024 * 1024, quizGraceSec: 5,
+  uploadDir: path.join(__dirname, '..', 'uploads'), backupDir: path.join(__dirname, '..', 'backups'), maxUploadBytes: 10 * 1024 * 1024, quizGraceSec: 5,
   trustProxy: false, staticDir: path.join(__dirname, '..', '..', 'frontend', 'dist'),
 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,6 +47,11 @@ function createApp(db, overrides = {}) {
     next();
   });
   app.use('/api', auth.attachUser);
+  // Every route can record an audit entry attributed to the signed-in user and their address.
+  app.use('/api', (req, _res, next) => {
+    req.log = (action, detail = '', status = 'success') => auth.logActivity({ userId: req.user ? req.user.id : null, email: req.user ? req.user.email : '', action, detail, ip: req.ip || '', status });
+    next();
+  });
 
   const api = express.Router();
   const ip = (req) => req.ip || req.socket.remoteAddress || 'unknown';
@@ -207,16 +215,24 @@ function createApp(db, overrides = {}) {
   });
 
   admin.get('/activity-logs', (req, res) => {
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
-    const rows = db.prepare('SELECT id, at, actor_email AS user, action, detail, ip, status FROM activity_log ORDER BY id DESC LIMIT ?').all(limit);
-    res.json({ logs: rows });
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500), offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const where = [], args = [];
+    if (['success', 'failed'].includes(req.query.status)) { where.push('status = ?'); args.push(req.query.status); }
+    if (typeof req.query.q === 'string' && req.query.q.trim()) { where.push('(action LIKE ? OR actor_email LIKE ? OR detail LIKE ?)'); const q = `%${req.query.q.trim().slice(0, 100)}%`; args.push(q, q, q); }
+    const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const total = db.prepare(`SELECT COUNT(*) c FROM activity_log ${w}`).get(...args).c;
+    const rows = db.prepare(`SELECT id, at, actor_email AS user, action, detail, ip, status FROM activity_log ${w} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
+    res.json({ logs: rows, total });
   });
 
+  admin.use('/backups', backupRoutes({ db, auth, config }));
   api.use('/admin', admin);
   const uploads = makeUploads(config);
   const access = makeAccess(db);
   api.use(academicRoutes({ db, auth, access, uploads }));
   api.use(assessmentRoutes({ db, auth, access, uploads, config }));
+  api.use(communicationRoutes({ db, auth, access }));
+  api.use(reportRoutes({ db, auth }));
   api.use((_req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);
 

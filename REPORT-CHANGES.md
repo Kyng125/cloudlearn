@@ -13,3 +13,7 @@ Items where the seminar report and the build diverge. Apply after the owner rele
 11. FR5/FR7: uploads are stored on the application server's disk (not object storage) with a type allow-list and size limit.
 12. FR9: quiz scoring and timing are enforced on the server; answers are saved progressively; the report's wording about client-side scoring, if any, should be corrected.
 13. Late-submission logic (Figure 3.5) is implemented against the server clock.
+14. FR10: forums are per-course and visible to enrolled students, the instructor and admins; direct messaging is limited to student<->own instructors and admin<->anyone.
+15. FR12: three reports (Users, Course Performance, Assessment Results) with CSV export; they are generated from committed records and reconciled against raw rows in the tests.
+16. Logging: the activity log records authentication, administrative and academic events from the server.
+17. Backup/recovery: online database snapshot plus uploaded files, validated restore with automatic safety copy; backups are manual.

@@ -58,6 +58,7 @@ function assessmentRoutes({ db, auth, access, uploads, config }) {
       .run(id, req.course.id, title, str(b.description, 4000), new Date(b.dueDate).toISOString(), max, now());
     db.prepare('SELECT student_id FROM enrollments WHERE course_id=?').all(req.course.id)
       .forEach((e) => notify(e.student_id, 'assignment', 'New assignment', `"${title}" was posted in ${req.course.title}.`));
+    req.log('Created assignment', title);
     res.status(201).json({ assignment: assignmentOut(assignmentRow(id), req.user) });
   });
 
@@ -93,10 +94,11 @@ function assessmentRoutes({ db, auth, access, uploads, config }) {
           db.prepare('INSERT INTO submissions (id,assignment_id,student_id,content,file_name,stored_name,submitted_at,is_late) VALUES (?,?,?,?,?,?,?,?)')
             .run(id, a.id, req.user.id, content, uploads.cleanName(req.file.originalname), req.file.filename, now(), late);
         }
-        notify(req.course.instructor_id, 'submission', 'New submission', `${req.user.name} submitted "${a.title}"${late ? ' (late)' : ''}.`);
+        notify(req.course.instructor_id, 'assignment', 'New submission', `${req.user.name} submitted "${a.title}"${late ? ' (late)' : ''}.`);
       })();
     } catch (e) { uploads.remove(req.file.filename); throw e; } // failed record leaves no orphan file
     if (prior) uploads.remove(prior.stored_name);
+    req.log(prior ? 'Resubmitted assignment' : 'Submitted assignment', `${a.title}${late ? ' (late)' : ''}`);
     res.status(201).json({ submission: subOut(db.prepare('SELECT * FROM submissions WHERE id=?').get(id)) });
   });
 
@@ -132,6 +134,7 @@ function assessmentRoutes({ db, auth, access, uploads, config }) {
         .run(req.sub.id, score, str(feedback, 4000), req.user.id, now());
       notify(req.sub.student_id, 'grade', 'Assignment graded', `Your "${req.assignment.title}" scored ${score}/${max}.`);
     })();
+    req.log('Graded submission', `${req.assignment.title}: ${score}/${max}`);
     res.json({ submission: subOut(req.sub) });
   });
 
@@ -200,6 +203,7 @@ function assessmentRoutes({ db, auth, access, uploads, config }) {
       b.questions.forEach((q, i) => db.prepare('INSERT INTO questions (id,quiz_id,text,options_json,correct_index,points,explanation,position) VALUES (?,?,?,?,?,?,?,?)')
         .run(newId('q'), id, str(q.text, 500), JSON.stringify(q.options.map((o) => str(o, 200))), q.correctIndex, q.points || 1, str(q.explanation, 1000), i));
     })();
+    req.log('Created quiz', title);
     res.status(201).json({ quiz: quizOut(quizRow(id), req.user, { questions: true }) });
   });
 
@@ -217,6 +221,7 @@ function assessmentRoutes({ db, auth, access, uploads, config }) {
       db.prepare('SELECT student_id FROM enrollments WHERE course_id=?').all(q.course_id)
         .forEach((e) => notify(e.student_id, 'quiz', 'New quiz available', `"${q.title}" is now available in ${req.course.title}.`));
     }
+    if (b.isPublished !== undefined && b.isPublished !== !!q.is_published) req.log(b.isPublished ? 'Published quiz' : 'Unpublished quiz', q.title);
     res.json({ quiz: quizOut(quizRow(q.id), req.user, { questions: true }) });
   });
 
@@ -305,6 +310,7 @@ function assessmentRoutes({ db, auth, access, uploads, config }) {
       }
       att = finalize(att, req.quiz);
     }
+    if (!req.att.completed_at) req.log('Completed quiz', `${req.quiz.title}: ${att.score}/${att.total_points}`);
     res.json({ attempt: attemptOut(att, req.quiz, { review: true }) });
   });
 
@@ -318,16 +324,6 @@ function assessmentRoutes({ db, auth, access, uploads, config }) {
       const fin = a.completed_at ? a : (expired(a, req.quiz) ? finalize(a, req.quiz) : a);
       return { ...attemptOut(fin, req.quiz), studentName: db.prepare('SELECT name FROM users WHERE id=?').get(fin.student_id).name };
     }) });
-  });
-
-  // ================= Notifications (minimal read side; completed in Phase 4) =================
-  r.get('/notifications', (req, res) => {
-    res.json({ notifications: db.prepare('SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC, rowid DESC LIMIT 100').all(req.user.id)
-      .map((n) => ({ id: n.id, type: n.type, title: n.title, body: n.body, isRead: !!n.is_read, createdAt: n.created_at })) });
-  });
-  r.post('/notifications/:id/read', (req, res) => {
-    const info = db.prepare('UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?').run(req.params.id, req.user.id);
-    res.status(info.changes ? 200 : 404).json(info.changes ? { ok: true } : { error: 'Notification not found' });
   });
 
   return r;

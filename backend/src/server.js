@@ -8,6 +8,7 @@ const db = openDb(dbFile);
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 const app = createApp(db, {
   uploadDir,
+  backupDir: process.env.BACKUP_DIR || path.join(__dirname, '..', 'backups'),
   cookieSecure: prod,
   trustProxy: prod,
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 10,

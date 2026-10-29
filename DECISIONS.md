@@ -20,9 +20,17 @@
 | D17 | Password rule 6 to 72 characters (matches front end minimum; 72 is the bcrypt limit) | ASSUMED | Owner may want a stronger minimum |
 | D18 | Uploads authorised BEFORE the file is accepted (middleware order), stored under random names outside the web root, extension allow-list, 10 MB limit, forced-download responses | DECIDED | Verified by tests and by a mutation check |
 | D19 | Late flag is computed from the server clock; client-supplied lateness/time is ignored | DECIDED | TC07 |
-| D20 | A submission can be replaced until it is graded; after grading it is locked | ASSUMED | Owner may prefer allowing re-grade-reset |
+| D20 | A submission can be replaced until grading is recorded; once a grade exists it is locked | CONFIRMED (owner, with the clarification "as long as it does not affect grading") | Interpreted as: the lock starts when a grade is written |
 | D21 | Quizzes: server holds the clock and answer key; answers saved progressively; expired attempts are scored from saved answers only; 5 s grace | DECIDED | TC09 |
 | D22 | Exams allow one attempt; ordinary quizzes unlimited retakes with history | ASSUMED (A11) | |
+| D26 | 10 MB upload limit | CONFIRMED (owner) | |
 | D23 | Course deletion refused once students are enrolled (unpublish instead); quiz deletion refused once attempted | DECIDED | Protects student records |
 | D24 | Upgraded multer 1.x to 2.x after `npm audit` reported a crash vulnerability in its multipart parser | DECIDED | `npm audit --omit=dev`: 0 vulnerabilities |
 | D25 | Price, rating, tags and per-lesson resources from the Figma data model are not implemented | DECIDED | Outside MVP scope; hidden in Phase 5 |
+| D27 | Forum access = enrolled students, the course instructor and admins; non-members get 403 (content) | DECIDED | TC10 |
+| D28 | Direct messages: student <-> instructors of courses they are enrolled in, admin <-> anyone; everything else 403 (same answer for unknown users) | ASSUMED (A14) | Prevents spam and user enumeration |
+| D29 | Three reports: Users (admin only), Course Performance and Assessment Results (admin all, instructor own courses); CSV via `?format=csv` | DECIDED | TC11 |
+| D30 | CSV cells starting with = + - @ are prefixed with an apostrophe; UTF-8 BOM added for Excel | DECIDED | Formula-injection protection |
+| D31 | Backup = SQLite online-backup snapshot + copy of uploads, stored under `BACKUP_DIR`; restore validates integrity and layout, takes an automatic safety backup, replaces all tables in one transaction, restores files, and revokes all sessions | DECIDED | Backups contain password hashes: protect the backup disk |
+| D32 | Activity log is written by the server for real events only (never client supplied); attempted passwords are never logged | DECIDED | |
+| D33 | Notification types limited to the front-end union (assignment, grade, message, course, quiz, system) | DECIDED | |

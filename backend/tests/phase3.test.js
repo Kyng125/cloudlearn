@@ -114,7 +114,7 @@ test('TC05: a student enrols; the record is written and materials become accessi
   assert.ok(s.db.prepare('SELECT 1 FROM enrollments WHERE student_id=? AND course_id=?').get(uid, 'c3'), 'enrolment row written');
   assert.equal((await stu.get(`/api/materials/${mid}/download`)).status, 200);
   assert.equal((await stu.get('/api/courses/c3/materials')).json.materials.length, 1);
-  assert.ok((await ins2.get('/api/notifications')).json.notifications.some((n) => n.type === 'enrollment'));
+  assert.ok((await ins2.get('/api/notifications')).json.notifications.some((n) => n.type === 'course'));
   await s.close();
 });
 
@@ -149,7 +149,7 @@ test('TC06: an on-time submission stores the file, writes the record and notifie
   const row = s.db.prepare("SELECT * FROM submissions WHERE id=?").get(r.json.submission.id);
   assert.equal(row.is_late, 0); assert.ok(fs.existsSync(path.join(s.uploadDir, row.stored_name)));
   const notes = (await ins.get('/api/notifications')).json.notifications;
-  assert.equal(notes.length, before + 1); assert.equal(notes[0].type, 'submission'); assert.match(notes[0].body, /Chidi Okafor/);
+  assert.equal(notes.length, before + 1); assert.equal(notes[0].type, 'assignment'); assert.match(notes[0].body, /Chidi Okafor/);
   await s.close();
 });
 

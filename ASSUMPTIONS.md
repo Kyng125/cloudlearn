@@ -12,3 +12,6 @@
 - A11 Exams are single-attempt; ordinary quizzes allow unlimited retakes (not stated in the report).
 - A12 Allowed upload types are documents, images, archives and common source files; max 10 MB. Owner may adjust.
 - A13 Quiz questions cannot be edited after creation in this phase (create, publish, unpublish, delete-if-unattempted only).
+- A14 Messaging rules in D28 are an assumption; the report does not define who may message whom.
+- A15 Instructors may see reports only for their own courses.
+- A16 Backups are manual and kept until an admin deletes them; no schedule or automatic pruning (operations note for Phase 7).

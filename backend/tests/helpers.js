@@ -9,11 +9,12 @@ async function start(opts = {}) {
   const db = opts.db || openDb(opts.file || ':memory:');
   if (!opts.skipSeed && !db.prepare('SELECT COUNT(*) c FROM users').get().c) seed(db, { rounds: 4 });
   const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-up-'));
-  const app = createApp(db, { ...TEST_CONFIG, uploadDir, ...(opts.config || {}) });
+  const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-bk-'));
+  const app = createApp(db, { ...TEST_CONFIG, uploadDir, backupDir, ...(opts.config || {}) });
   const server = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
   server.unref(); // a failing assertion must not leave the process hanging on an open server
   const base = `http://127.0.0.1:${server.address().port}`;
-  return { db, base, uploadDir, close: () => new Promise((r) => { server.closeAllConnections(); server.close(r); }) };
+  return { db, base, uploadDir, backupDir, close: () => new Promise((r) => { server.closeAllConnections(); server.close(r); }) };
 }
 
 // Minimal HTTP client with a cookie jar so each instance behaves like one browser.
