@@ -1,8 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../context';
+import { api, errorMessage } from '../api';
+import type { Course } from '../types';
 import { PublicLayout } from '../components/Layout';
-import { Button, Card, Badge, StarRating, LevelBadge } from '../components/UI';
-import { CATEGORIES } from '../data';
+import { Button, Card, Badge, LevelBadge } from '../components/UI';
+import { CATEGORIES } from '../lib/constants';
+
+// Published courses: from the signed-in user's data, or the public catalogue when signed out.
+function usePublishedCourses(): { courses: Course[]; loading: boolean; error: string } {
+  const { currentUser, courses } = useApp();
+  const [pub, setPub] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(!currentUser);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (currentUser) { setLoading(false); return; }
+    let live = true;
+    setLoading(true); setError('');
+    api.get('/public/courses').then(r => { if (live) setPub((r.courses as any[]).map(c => ({ ...c, duration: `${Math.round((c.durationMinutes || 0) / 60 * 10) / 10} h`, modules: [] }))); })
+      .catch(e => { if (live) setError(errorMessage(e)); }).finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [currentUser]);
+  return { courses: currentUser ? courses.filter(c => c.isPublished) : pub, loading, error };
+}
+
+function CourseGridState({ loading, error, empty }: { loading: boolean; error: string; empty: boolean }) {
+  if (loading) return <p className="text-sm text-[#6b7fa8]">Loading courses…</p>;
+  if (error) return <p className="text-sm text-red-400">{error}</p>;
+  if (empty) return <p className="text-sm text-[#6b7fa8]">No published courses yet.</p>;
+  return null;
+}
 
 const FEATURES = [
   { icon: '🎓', title: 'Role-Based Workspaces', desc: 'Separate dashboards and permissions for students, instructors and administrators.' },
@@ -14,14 +40,15 @@ const FEATURES = [
 ];
 
 export function Landing() {
-  const { navigate, courses, users, enrollments, getUserById } = useApp();
+  const { navigate } = useApp();
+  const { courses: published, loading, error } = usePublishedCourses();
   const STATS = [
-    { label: 'Published Courses', value: String(courses.filter(c => c.isPublished).length) },
-    { label: 'Students', value: String(users.filter(u => u.role === 'student').length) },
-    { label: 'Instructors', value: String(users.filter(u => u.role === 'instructor').length) },
-    { label: 'Enrolments', value: String(enrollments.length) },
+    { label: 'Published Courses', value: loading ? '…' : String(published.length) },
+    { label: 'Course Categories', value: String(CATEGORIES.length) },
+    { label: 'Instructors', value: loading ? '…' : String(new Set(published.map(c => c.instructorId)).size) },
+    { label: 'Enrolments', value: loading ? '…' : String(published.reduce((a, c) => a + c.enrolledCount, 0)) },
   ];
-  const featuredCourses = courses.filter(c => c.isPublished).slice(0, 6);
+  const featuredCourses = published.slice(0, 6);
 
   return (
     <PublicLayout>
@@ -31,10 +58,10 @@ export function Landing() {
         <div className="max-w-5xl mx-auto text-center relative">
           <Badge variant="cyan" className="mb-6">🚀 Cloud-Based Learning Platform</Badge>
           <h1 className="font-display font-bold text-5xl md:text-7xl text-[#f0f4ff] mb-6 leading-[1.05]">
-            Learn Without <span className="text-gradient">Limits</span>
+            Your HND Computer Science <span className="text-gradient">Classroom, Online</span>
           </h1>
           <p className="text-lg md:text-xl text-[#6b7fa8] max-w-2xl mx-auto mb-10 leading-relaxed">
-            CloudLearn is a cloud-based e-learning platform for hybrid learning, built as a case study for the Department of Computer Science, Yaba College of Technology. Courses, assignments, assessments and discussion in one place.
+            CloudLearn is a cloud-based e-learning platform for hybrid learning, built for the Department of Computer Science, Yaba College of Technology. Course materials, assignments, timed quizzes and discussion for HND students, on campus or off.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button size="lg" onClick={() => navigate('register')}>Get Started →</Button>
@@ -99,7 +126,7 @@ export function Landing() {
             {CATEGORIES.map(cat => (
               <button key={cat.id} onClick={() => navigate('courses')}
                 className="flex items-center gap-2 px-4 py-2 bg-[#111827] hover:bg-[#1a2540] border border-[rgba(255,255,255,0.07)] rounded-lg text-sm text-[#a0b4d0] transition-colors">
-                {cat.icon} {cat.name} <span className="text-xs text-[#4a5a7a]">{cat.courseCount}</span>
+                {cat.icon} {cat.name} <span className="text-xs text-[#4a5a7a]">{published.filter(c => c.category === cat.name).length}</span>
               </button>
             ))}
           </div>
@@ -115,7 +142,6 @@ export function Landing() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {featuredCourses.map(course => {
-              const instructor = getUserById(course.instructorId);
               return (
                 <Card key={course.id} className="overflow-hidden cursor-pointer" onClick={() => navigate('course-detail', { courseId: course.id })}>
                   <div className="h-40 bg-[#1a2540] relative">
@@ -128,14 +154,15 @@ export function Landing() {
                     <h3 className="font-display font-bold text-[#f0f4ff] mb-1 line-clamp-2">{course.title}</h3>
                     <p className="text-xs text-[#6b7fa8] mb-3 line-clamp-2">{course.description}</p>
                     <div className="flex items-center justify-between text-xs text-[#4a5a7a]">
-                      <span>{instructor?.name}</span>
-                      <StarRating rating={course.rating} />
+                      <span>{course.instructorName}</span>
+                      <span>{course.duration}</span>
                     </div>
                   </div>
                 </Card>
               );
             })}
           </div>
+          <CourseGridState loading={loading} error={error} empty={featuredCourses.length === 0} />
         </div>
       </section>
 
@@ -179,13 +206,13 @@ export function Landing() {
 // ── Course Browser (Public) ──────────────────────────────────────────────
 
 export function CourseBrowser() {
-  const { navigate, courses, getUserById } = useApp();
+  const { navigate } = useApp();
+  const { courses, loading, error } = usePublishedCourses();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [level, setLevel] = useState('');
 
   const filtered = courses.filter(c => {
-    if (!c.isPublished) return false;
     if (search && !c.title.toLowerCase().includes(search.toLowerCase()) && !c.description.toLowerCase().includes(search.toLowerCase())) return false;
     if (category && c.category !== category) return false;
     if (level && c.level !== level) return false;
@@ -196,7 +223,7 @@ export function CourseBrowser() {
     <PublicLayout>
       <div className="max-w-6xl mx-auto px-6 py-12">
         <h1 className="font-display font-bold text-4xl text-[#f0f4ff] mb-2">All Courses</h1>
-        <p className="text-[#6b7fa8] mb-8">{filtered.length} courses available</p>
+        <p className="text-[#6b7fa8] mb-8">{loading ? 'Loading…' : `${filtered.length} courses available`}</p>
         <div className="flex flex-wrap gap-3 mb-8">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses..."
             className="flex-1 min-w-48 px-3 py-2 bg-[#111827] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff] placeholder-[#4a5a7a] focus:outline-none focus:border-blue-500" />
@@ -211,7 +238,6 @@ export function CourseBrowser() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(course => {
-            const instructor = getUserById(course.instructorId);
             return (
               <Card key={course.id} className="overflow-hidden cursor-pointer" onClick={() => navigate('course-detail', { courseId: course.id })}>
                 <div className="h-40 bg-[#1a2540] relative">
@@ -224,14 +250,15 @@ export function CourseBrowser() {
                   <h3 className="font-display font-bold text-[#f0f4ff] mb-1 line-clamp-2">{course.title}</h3>
                   <p className="text-xs text-[#6b7fa8] mb-3 line-clamp-2">{course.description}</p>
                   <div className="flex items-center justify-between text-xs text-[#4a5a7a]">
-                    <span>{instructor?.name}</span>
-                    <StarRating rating={course.rating} />
+                    <span>{course.instructorName}</span>
+                    <span>{course.duration}</span>
                   </div>
                 </div>
               </Card>
             );
           })}
         </div>
+        <CourseGridState loading={loading} error={error} empty={filtered.length === 0} />
       </div>
     </PublicLayout>
   );
@@ -240,11 +267,14 @@ export function CourseBrowser() {
 // ── Course Detail (Public) ──────────────────────────────────────────────
 
 export function CourseDetail() {
-  const { navigate, routeParams, enrollInCourse, currentUser, enrollments, courses, getUserById } = useApp();
-  const course = courses.find(c => c.id === routeParams.courseId);
+  const { navigate, routeParams, enrollInCourse, currentUser, enrollments, dataReady } = useApp();
+  const { courses, loading } = usePublishedCourses();
+  const [enrolling, setEnrolling] = useState(false);
+  const own = useApp().courses.find(c => c.id === routeParams.courseId);
+  const course = own || courses.find(c => c.id === routeParams.courseId);
+  if (loading || (currentUser && !dataReady)) return <PublicLayout><div className="p-8 text-center text-[#6b7fa8]">Loading…</div></PublicLayout>;
   if (!course) return <PublicLayout><div className="p-8 text-center text-[#6b7fa8]">Course not found</div></PublicLayout>;
 
-  const instructor = getUserById(course.instructorId);
   const isEnrolled = currentUser ? enrollments.some(e => e.studentId === currentUser.id && e.courseId === course.id) : false;
   const totalLessons = course.modules.reduce((a, m) => a + m.lessons.length, 0);
 
@@ -266,6 +296,7 @@ export function CourseDetail() {
               <LevelBadge level={course.level} />
             </div>
             <h2 className="font-display font-bold text-lg text-[#f0f4ff] mb-4">Course Content</h2>
+            {!currentUser && <p className="text-sm text-[#6b7fa8] mb-3">Sign in to see the full module and lesson outline.</p>}
             <div className="space-y-3">
               {course.modules.map(mod => (
                 <Card key={mod.id} className="p-4">
@@ -295,15 +326,15 @@ export function CourseDetail() {
                   ) : currentUser && currentUser.role !== 'student' ? (
                     <p className="text-sm text-[#6b7fa8]">Only student accounts can enrol in courses.</p>
                   ) : (
-                    <Button className="w-full" onClick={() => {
+                    <Button className="w-full" disabled={enrolling} onClick={async () => {
                       if (!currentUser) { navigate('login'); return; }
-                      enrollInCourse(course.id);
+                      setEnrolling(true); await enrollInCourse(course.id); setEnrolling(false);
                     }}>
-                      {currentUser ? 'Enroll Now' : 'Sign in to Enroll'}
+                      {currentUser ? (enrolling ? 'Enrolling…' : 'Enroll Now') : 'Sign in to Enroll'}
                     </Button>
                   )}
                   <div className="mt-4 space-y-2 text-sm text-[#6b7fa8]">
-                    <div className="flex items-center gap-2"><span>👤</span> <span>Instructor: {instructor?.name}</span></div>
+                    <div className="flex items-center gap-2"><span>👤</span> <span>Instructor: {course.instructorName}</span></div>
                     <div className="flex items-center gap-2"><span>📅</span> <span>Created {course.createdAt}</span></div>
                     <div className="flex items-center gap-2"><span>📱</span> <span>Access on all devices</span></div>
                   </div>

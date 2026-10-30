@@ -17,7 +17,7 @@ npm run dev
 Demo logins (password `demo123`): student@ / instructor@ / admin@cloudlearn.com
 
 ## Status
-Phases 1 to 4 complete (front end repaired, backend auth/roles, academic API, communication/reports/backup). The front end still uses localStorage; it is connected to the API in Phase 5.
+Phases 1 to 5 complete (front end repaired and connected to the API, backend auth/roles, academic API, communication/reports/backup). Phases 6 and 7 (evaluation tooling, deployment) remain.
 
 ## Backend
 ```
@@ -32,5 +32,8 @@ Uploaded files go to `backend/uploads/` (git-ignored). Env: `PORT`, `DB_FILE`, `
 ## Regression test
 ```
 cd frontend && npm run build && npx vite preview --port 4173 &
-node tests/e2e/regression.js
+cd frontend && npm run build   # backend serves frontend/dist
+# seed a temp DB and start backend (see backend/README), then:
+NODE_PATH=$(npm root -g) node tests/e2e/crawl.js   # every screen, 3 roles, desktop + mobile
+NODE_PATH=$(npm root -g) node tests/e2e/flow.js    # TC01-13 flows, desktop + mobile
 ```

@@ -1,13 +1,13 @@
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, StatCard, ProgressBar, Badge, SectionHeader } from '../../components/UI';
-import { ACTIVITY_DATA } from '../../data';
 import { averageGradePercent } from '../../lib/derive';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from 'recharts';
 
 export default function Progress() {
-  const { currentUser, enrollments, submissions, quizAttempts, assignments, getCourseById } = useApp();
+  const { currentUser, enrollments, submissions, quizAttempts, assignments, getCourseById, quizzes, discussions, dataReady } = useApp();
   if (!currentUser) return null;
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
 
   const myEnrollments = enrollments.filter(e => e.studentId === currentUser.id);
   const myCourses = myEnrollments.map(e => ({ enrollment: e, course: getCourseById(e.courseId)! })).filter(x => x.course);
@@ -78,13 +78,13 @@ export default function Progress() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         {/* Weekly activity */}
         <Card className="p-5">
-          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Weekly Study Time (min) <span className="text-xs font-normal text-[#4a5a7a]">(sample data)</span></h3>
+          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Lessons Completed by Course</h3>
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={ACTIVITY_DATA}>
-              <XAxis dataKey="week" stroke="#4a5a7a" tick={{ fontSize: 11 }} />
+            <BarChart data={myCourses.map(({ enrollment, course }) => ({ name: course.title, lessons: enrollment.completedLessons.length }))}>
+              <XAxis dataKey="name" interval={0} tickFormatter={(v: string) => v.slice(0, 10)} stroke="#4a5a7a" tick={{ fontSize: 11 }} />
               <YAxis stroke="#4a5a7a" tick={{ fontSize: 11 }} />
               <Tooltip contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="minutes" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="lessons" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -95,8 +95,8 @@ export default function Progress() {
           {myAttempts.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={150}>
-                <BarChart data={myAttempts.map(a => ({ name: `Quiz`, score: Math.round(a.score / a.totalPoints * 100), fill: a.passed ? '#10b981' : '#ef4444' }))}>
-                  <XAxis stroke="#4a5a7a" tick={{ fontSize: 11 }} />
+                <BarChart data={myAttempts.map(a => ({ name: quizzes.find(q => q.id === a.quizId)?.title.slice(0, 10) ?? 'Quiz', score: Math.round(a.score / a.totalPoints * 100), fill: a.passed ? '#10b981' : '#ef4444' }))}>
+                  <XAxis dataKey="name" stroke="#4a5a7a" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 100]} stroke="#4a5a7a" tick={{ fontSize: 11 }} />
                   <Tooltip contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }} />
                   <Bar dataKey="score" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -105,7 +105,7 @@ export default function Progress() {
               <div className="mt-3 space-y-2">
                 {myAttempts.map(a => (
                   <div key={a.id} className="flex items-center justify-between text-sm">
-                    <span className="text-[#a0b4d0]">Attempt {a.id.slice(-1)}</span>
+                    <span className="text-[#a0b4d0]">{quizzes.find(q => q.id === a.quizId)?.title ?? 'Quiz'}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-[#f0f4ff] font-mono">{a.score}/{a.totalPoints}</span>
                       <Badge variant={a.passed ? 'green' : 'red'}>{a.passed ? 'Pass' : 'Fail'}</Badge>
@@ -130,7 +130,7 @@ export default function Progress() {
             { icon: '📝', label: 'Assignment Submitted', earned: submissions.filter(s => s.studentId === currentUser.id).length > 0 },
             { icon: '❓', label: 'Quiz Taker', earned: myAttempts.length > 0 },
             { icon: '🏆', label: 'High Achiever', earned: avgGrade >= 90 },
-            { icon: '💬', label: 'Community Member', earned: true },
+            { icon: '💬', label: 'Community Member', earned: discussions.some(d => d.authorId === currentUser.id || d.replies.some(r => r.authorId === currentUser.id)) },
             { icon: '⚡', label: 'Quick Starter', earned: myEnrollments.length >= 2 },
             { icon: '🌟', label: 'Star Student', earned: completedCourses >= 2 },
           ].map(a => (

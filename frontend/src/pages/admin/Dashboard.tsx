@@ -1,20 +1,17 @@
+import { useState, useEffect } from 'react';
 import { useApp } from '../../context';
+import { api } from '../../api';
+import type { LogRow } from './AdminPages';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, StatCard, Badge, Avatar } from '../../components/UI';
 import { monthlyEnrollments } from '../../lib/derive';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-const LOG_ENTRIES = [
-  { time: '2024-07-23 14:32', user: 'student@cloudlearn.com', action: 'Logged in', ip: '192.168.1.1', status: 'success' },
-  { time: '2024-07-23 14:28', user: 'instructor@cloudlearn.com', action: 'Published course', ip: '10.0.0.5', status: 'success' },
-  { time: '2024-07-23 14:15', user: 'emily.r@example.com', action: 'Submitted assignment', ip: '172.16.0.3', status: 'success' },
-  { time: '2024-07-23 13:50', user: 'unknown@attacker.com', action: 'Failed login attempt', ip: '45.33.32.156', status: 'failed' },
-  { time: '2024-07-23 13:45', user: 'admin@cloudlearn.com', action: 'Modified user role', ip: '192.168.1.100', status: 'success' },
-];
-
-
 export default function AdminDashboard() {
   const { users, courses, enrollments, navigate } = useApp();
+
+  const [logs, setLogs] = useState<LogRow[]>([]);
+  useEffect(() => { api.get('/admin/activity-logs?limit=6').then(r => setLogs(r.logs)).catch(() => setLogs([])); }, []);
 
   const students = users.filter(u => u.role === 'student');
   const instructors = users.filter(u => u.role === 'instructor');
@@ -34,12 +31,6 @@ export default function AdminDashboard() {
         <div>
           <h1 className="font-display font-bold text-2xl text-[#f0f4ff]">Admin Dashboard</h1>
           <p className="text-[#6b7fa8] text-sm mt-1">Platform overview and management controls</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-400">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            Prototype mode
-          </div>
         </div>
       </div>
 
@@ -139,7 +130,7 @@ export default function AdminDashboard() {
       {/* Recent Activity Log */}
       <Card className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-bold text-[#f0f4ff]">Recent Activity Log <span className="text-xs font-normal text-[#4a5a7a]">(sample entries)</span></h3>
+          <h3 className="font-display font-bold text-[#f0f4ff]">Recent Activity Log</h3>
           <button onClick={() => navigate('admin-logs')} className="text-xs text-blue-400 hover:text-blue-300">View full log</button>
         </div>
         <div className="overflow-x-auto">
@@ -152,15 +143,16 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {LOG_ENTRIES.map((e, i) => (
-                <tr key={i} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
-                  <td className="px-3 py-2 font-mono text-xs text-[#6b7fa8]">{e.time}</td>
-                  <td className="px-3 py-2 text-[#a0b4d0]">{e.user}</td>
+              {logs.map((e) => (
+                <tr key={e.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
+                  <td className="px-3 py-2 font-mono text-xs text-[#6b7fa8]">{e.at.replace('T', ' ').slice(0, 16)}</td>
+                  <td className="px-3 py-2 text-[#a0b4d0]">{e.user || '—'}</td>
                   <td className="px-3 py-2 text-[#f0f4ff]">{e.action}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-[#6b7fa8]">{e.ip}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-[#6b7fa8]">{e.ip || ''}</td>
                   <td className="px-3 py-2"><Badge variant={e.status === 'success' ? 'green' : 'red'}>{e.status}</Badge></td>
                 </tr>
               ))}
+              {logs.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-[#4a5a7a]">No activity recorded yet</td></tr>}
             </tbody>
           </table>
         </div>

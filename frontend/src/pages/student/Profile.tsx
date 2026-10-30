@@ -4,7 +4,7 @@ import { DashboardLayout } from '../../components/Layout';
 import { Card, Button, Field, Input, Textarea, Avatar, Badge, SectionHeader } from '../../components/UI';
 
 export default function Profile() {
-  const { currentUser, updateUser, logout, addToast } = useApp();
+  const { currentUser, updateProfile, changePassword, logout, addToast } = useApp();
   if (!currentUser) return null;
 
   const [tab, setTab] = useState<'profile' | 'security' | 'notifications'>('profile');
@@ -24,18 +24,19 @@ export default function Profile() {
   const [pwError, setPwError] = useState('');
 
   const handleSave = async () => {
+    if (!name.trim()) return;
     setSaving(true);
-    await new Promise(r => setTimeout(r, 400));
-    updateUser(currentUser.id, { name, bio, phone, location });
+    await updateProfile({ name: name.trim(), bio, phone, location });
     setSaving(false);
   };
 
-  const handlePwChange = () => {
+  const handlePwChange = async () => {
     setPwError('');
-    if (currentPw !== currentUser.password) { setPwError('Current password is incorrect'); return; }
+    if (!currentPw) { setPwError('Enter your current password'); return; }
     if (newPw.length < 6) { setPwError('New password must be at least 6 characters'); return; }
     if (newPw !== confirmPw) { setPwError('Passwords do not match'); return; }
-    updateUser(currentUser.id, { password: newPw });
+    const r = await changePassword(currentPw, newPw);
+    if (!r.ok) { setPwError(r.error || 'Could not change password'); return; }
     setCurrentPw(''); setNewPw(''); setConfirmPw('');
   };
 

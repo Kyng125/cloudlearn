@@ -1,13 +1,13 @@
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, StatCard, ProgressBar, Badge, Button } from '../../components/UI';
-import { ACTIVITY_DATA } from '../../data';
 import { averageGradePercent, gradePercent } from '../../lib/derive';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function StudentDashboard() {
-  const { currentUser, enrollments, submissions, quizAttempts, navigate, notifications, assignments, getCourseById, getAssignmentsForCourse, getQuizzesForCourse } = useApp();
+  const { currentUser, enrollments, submissions, quizAttempts, navigate, notifications, assignments, getCourseById, getAssignmentsForCourse, getQuizzesForCourse, quizzes, dataReady } = useApp();
   if (!currentUser) return null;
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
 
   const myEnrollments = enrollments.filter(e => e.studentId === currentUser.id);
   const myCourses = myEnrollments.map(e => ({ enrollment: e, course: getCourseById(e.courseId)! })).filter(x => x.course);
@@ -15,7 +15,14 @@ export default function StudentDashboard() {
   const mySubmissions = submissions.filter(s => s.studentId === currentUser.id);
   const gradedSubmissions = mySubmissions.filter(s => s.grade !== null);
   const avgGrade = averageGradePercent(gradedSubmissions, assignments);
+  const quizTitle = (id: string) => quizzes.find(q => q.id === id)?.title ?? 'Quiz';
   const unreadNotifs = notifications.filter(n => n.userId === currentUser.id && !n.isRead);
+
+  // Recent results: graded assignments and quiz attempts as percentages, oldest to newest
+  const results = [
+    ...gradedSubmissions.map(sub => ({ label: assignments.find(a => a.id === sub.assignmentId)?.title ?? 'Assignment', when: sub.submittedAt, score: gradePercent(sub, assignments) ?? 0 })),
+    ...quizAttempts.filter(a => a.studentId === currentUser.id).map(a => ({ label: quizTitle(a.quizId), when: a.completedAt, score: a.totalPoints ? Math.round((a.score / a.totalPoints) * 100) : 0 })),
+  ].sort((x, y) => new Date(x.when).getTime() - new Date(y.when).getTime()).slice(-8);
 
   // Upcoming assignments
   const upcoming = myCourses.flatMap(({ course }) =>
@@ -54,21 +61,17 @@ export default function StudentDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Learning Activity Chart */}
         <Card className="lg:col-span-2 p-5">
-          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Learning Activity (minutes/week) <span className="text-xs font-normal text-[#4a5a7a]">(sample data)</span></h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={ACTIVITY_DATA}>
-              <defs>
-                <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="week" stroke="#4a5a7a" tick={{ fontSize: 11 }} />
-              <YAxis stroke="#4a5a7a" tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }} />
-              <Area type="monotone" dataKey="minutes" stroke="#3b82f6" fill="url(#actGrad)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Recent Results (%)</h3>
+          {results.length > 0 ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={results}>
+                <XAxis dataKey="label" stroke="#4a5a7a" tick={{ fontSize: 10 }} interval={0} tickFormatter={(v: string) => v.slice(0, 10)} />
+                <YAxis domain={[0, 100]} stroke="#4a5a7a" tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }} />
+                <Bar dataKey="score" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <p className="text-sm text-[#4a5a7a] text-center py-12">Your graded work and quiz scores will appear here</p>}
         </Card>
 
         {/* Notifications */}

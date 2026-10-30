@@ -268,12 +268,12 @@ export function Tabs({ tabs, active, onChange }: {
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="flex gap-1 bg-[#0b1120] p-1 rounded-lg border border-[rgba(255,255,255,0.07)]">
+    <div className="flex gap-1 overflow-x-auto max-w-full bg-[#0b1120] p-1 rounded-lg border border-[rgba(255,255,255,0.07)]">
       {tabs.map(tab => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${active === tab.id ? 'bg-blue-600 text-white' : 'text-[#6b7fa8] hover:text-[#f0f4ff]'}`}
+          className={`flex shrink-0 whitespace-nowrap items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${active === tab.id ? 'bg-blue-600 text-white' : 'text-[#6b7fa8] hover:text-[#f0f4ff]'}`}
         >
           {tab.label}
           {tab.count !== undefined && (

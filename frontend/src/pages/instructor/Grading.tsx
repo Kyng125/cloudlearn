@@ -33,10 +33,14 @@ export default function Grading() {
   const activeSubmission = mySubmissions.find(s => s.id === gradeModal);
   const maxPoints = activeSubmission?.assignment?.maxPoints || 100;
 
-  const handleGrade = () => {
-    if (!gradeModal || !grade) return;
+  const [saving, setSaving] = useState(false);
+  const handleGrade = async () => {
+    if (!gradeModal || !grade || saving) return;
     const g = Math.min(maxPoints, Math.max(0, parseFloat(grade)));
-    gradeSubmission(gradeModal, g, feedback);
+    setSaving(true);
+    const ok = await gradeSubmission(gradeModal, g, feedback);
+    setSaving(false);
+    if (!ok) return; // the error toast is shown by the context; keep the form open
     setGradeModal(null);
     setGrade('');
     setFeedback('');
@@ -73,7 +77,7 @@ export default function Grading() {
                       <p className="text-sm font-medium text-blue-400 mb-1">{s.assignment?.title}</p>
                       <p className="text-xs text-[#4a5a7a]">{s.assignment?.course?.title}</p>
                       <div className="flex items-center gap-3 mt-2 text-xs text-[#6b7fa8]">
-                        <span>📎 {s.fileName}</span>
+                        {s.fileName && <a href={`/api/submissions/${s.id}/download`} className="text-blue-400 hover:underline">📎 {s.fileName}</a>}
                         <span>📅 Submitted {new Date(s.submittedAt).toLocaleDateString()}</span>
                         <span>🏆 Max: {s.assignment?.maxPoints} pts</span>
                       </div>
@@ -111,7 +115,7 @@ export default function Grading() {
           <div className="space-y-4">
             <div className="p-3 bg-[rgba(255,255,255,0.02)] rounded-lg border border-[rgba(255,255,255,0.07)]">
               <div className="font-medium text-[#f0f4ff]">{activeSubmission.assignment?.title}</div>
-              <div className="text-sm text-[#6b7fa8]">By {activeSubmission.student?.name} · {activeSubmission.fileName}</div>
+              <div className="text-sm text-[#6b7fa8]">By {activeSubmission.student?.name}{activeSubmission.fileName && <> · <a href={`/api/submissions/${activeSubmission.id}/download`} className="text-blue-400 hover:underline">{activeSubmission.fileName}</a></>}</div>
               <div className="text-sm text-[#a0b4d0] mt-2">{activeSubmission.content}</div>
             </div>
             <Field label={`Score (out of ${maxPoints})`} required>
@@ -129,7 +133,7 @@ export default function Grading() {
             </Field>
             <div className="flex gap-3 justify-end">
               <Button variant="secondary" onClick={() => setGradeModal(null)}>Cancel</Button>
-              <Button onClick={handleGrade} disabled={!grade}>Submit Grade</Button>
+              <Button onClick={handleGrade} disabled={!grade || saving}>{saving ? 'Saving…' : 'Submit Grade'}</Button>
             </div>
           </div>
         )}

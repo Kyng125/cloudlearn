@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
-import { Card, Button, Badge, Field, Input, Textarea, Select, Modal, SectionHeader, EmptyState } from '../../components/UI';
-import { type Question } from '../../data';
+import { Card, Button, Badge, Field, Input, Textarea, Select, Modal, SectionHeader, EmptyState, ConfirmDialog } from '../../components/UI';
+import { type Question } from '../../types';
 
 export default function QuizBuilder() {
-  const { currentUser, courses, quizzes, createQuiz } = useApp();
+  const { currentUser, courses, quizzes, createQuiz, setQuizPublished, deleteQuiz } = useApp();
   if (!currentUser) return null;
 
   const myCourses = courses.filter(c => c.instructorId === currentUser.id);
@@ -14,6 +14,8 @@ export default function QuizBuilder() {
   }));
 
   const [createModal, setCreateModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [courseId, setCourseId] = useState('');
@@ -37,13 +39,17 @@ export default function QuizBuilder() {
     setCurrentQ({ options: ['', '', '', ''], correctIndex: 0, points: 10 });
   };
 
-  const handleCreate = () => {
-    createQuiz({
-      title, description, courseId, duration: parseInt(duration), passingScore: parseInt(passingScore), isExam, questions,
-      availableFrom: new Date().toISOString().split('T')[0], availableUntil: '',
-    });
+  const handleCreate = async (publish: boolean) => {
+    if (saving) return;
+    setSaving(true);
+    const ok = await createQuiz(courseId, {
+      title, description, durationMinutes: parseInt(duration) || 20, passingScore: parseInt(passingScore) || 70, isExam,
+      questions: questions.map(q => ({ text: q.text, options: q.options, correctIndex: q.correctIndex, points: q.points })),
+    }, publish);
+    setSaving(false);
+    if (!ok) return; // error toast already shown; keep the form so nothing is lost
     setCreateModal(false);
-    setTitle(''); setDescription(''); setCourseId(''); setQuestions([]);
+    setTitle(''); setDescription(''); setCourseId(''); setQuestions([]); setIsExam(false);
   };
 
   return (
@@ -64,14 +70,19 @@ export default function QuizBuilder() {
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="font-display font-bold text-[#f0f4ff] flex-1">{q.title}</h3>
                 {q.isExam && <Badge variant="red">Exam</Badge>}
+                <Badge variant={q.isPublished ? 'green' : 'gray'}>{q.isPublished ? 'Published' : 'Draft'}</Badge>
               </div>
               <p className="text-xs text-blue-400 mb-3">{q.course?.title}</p>
               <p className="text-sm text-[#a0b4d0] mb-4 line-clamp-2">{q.description}</p>
               <div className="flex flex-wrap gap-2 text-xs text-[#6b7fa8] mb-4">
                 <span>⏱ {q.duration} min</span>
-                <span>❓ {q.questions.length} questions</span>
+                <span>❓ {q.questionCount} questions</span>
                 <span>🎯 Pass: {q.passingScore}%</span>
                 <span>📅 {q.createdAt}</span>
+              </div>
+              <div className="flex gap-2">
+                <Button size="xs" variant={q.isPublished ? 'ghost' : 'primary'} onClick={() => setQuizPublished(q.id, !q.isPublished)}>{q.isPublished ? 'Unpublish' : 'Publish'}</Button>
+                <Button size="xs" variant="ghost" onClick={() => setToDelete(q.id)}>Delete</Button>
               </div>
             </Card>
           ))}
@@ -159,11 +170,14 @@ export default function QuizBuilder() {
 
         <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-[rgba(255,255,255,0.07)]">
           <Button variant="secondary" onClick={() => setCreateModal(false)}>Cancel</Button>
-          <Button onClick={handleCreate} disabled={!title || !courseId || questions.length === 0}>
-            Create {isExam ? 'Exam' : 'Quiz'} ({questions.length} questions)
+          <Button variant="secondary" onClick={() => handleCreate(false)} disabled={!title || !courseId || questions.length === 0 || saving}>Save as draft</Button>
+          <Button onClick={() => handleCreate(true)} disabled={!title || !courseId || questions.length === 0 || saving}>
+            {saving ? 'Saving…' : `Publish ${isExam ? 'Exam' : 'Quiz'} (${questions.length} questions)`}
           </Button>
         </div>
       </Modal>
+      <ConfirmDialog open={!!toDelete} onClose={() => setToDelete(null)} title="Delete quiz?" message="This also removes every student attempt for this quiz. It cannot be undone."
+        confirmLabel="Delete" onConfirm={() => { if (toDelete) deleteQuiz(toDelete); setToDelete(null); }} />
     </DashboardLayout>
   );
 }

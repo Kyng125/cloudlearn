@@ -1,15 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
-import { Card, Button, Badge, Avatar, SearchInput, SectionHeader, StatCard } from '../../components/UI';
-import { CATEGORIES, ACTIVITY_DATA } from '../../data';
-import { monthlyEnrollments, averageGradePercent } from '../../lib/derive';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { Card, Button, Badge, Avatar, SearchInput, SectionHeader, StatCard, Tabs, Field, Input, Textarea, Spinner, EmptyState, ConfirmDialog } from '../../components/UI';
+import { CATEGORIES } from '../../lib/constants';
+import { api, errorMessage } from '../../api';
 
 // ── Course Management ──────────────────────────────────────────────────────
 
 export function AdminCourses() {
-  const { courses, toggleCoursePublished, getUserById, getEnrollmentsForCourse } = useApp();
+  const { courses, toggleCoursePublished } = useApp();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
@@ -46,8 +45,7 @@ export function AdminCourses() {
             </thead>
             <tbody>
               {filtered.map(course => {
-                const instructor = getUserById(course.instructorId);
-                const enrolled = getEnrollmentsForCourse(course.id).length;
+                const enrolled = course.enrolledCount;
                 return (
                   <tr key={course.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
                     <td className="px-4 py-3">
@@ -63,8 +61,8 @@ export function AdminCourses() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Avatar src={instructor?.avatar} name={instructor?.name || ''} size={24} />
-                        <span className="text-[#a0b4d0]">{instructor?.name}</span>
+                        <Avatar name={course.instructorName} size={24} />
+                        <span className="text-[#a0b4d0]">{course.instructorName}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3"><Badge variant="purple">{course.category}</Badge></td>
@@ -92,188 +90,35 @@ export function AdminCourses() {
 }
 
 // ── Categories ──────────────────────────────────────────────────────────────
+// The category list is fixed by the platform (lib/constants); the admin sees how courses are spread across it.
 
 export function AdminCategories() {
-  const [catList, setCatList] = useState(CATEGORIES);
-  const [newCat, setNewCat] = useState('');
-  const [newIcon, setNewIcon] = useState('📁');
-
-  const handleAdd = () => {
-    if (!newCat.trim()) return;
-    setCatList(prev => [...prev, { id: `cat${Date.now()}`, name: newCat, icon: newIcon, courseCount: 0 }]);
-    setNewCat('');
-  };
-
+  const { courses } = useApp();
   return (
     <DashboardLayout>
-      <SectionHeader title="Category Management" description="Manage course categories" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2">
-          <Card>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[rgba(255,255,255,0.07)]">
-                    {['Icon', 'Category', 'Courses', 'Actions'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[#6b7fa8] uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {catList.map(cat => (
-                    <tr key={cat.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
-                      <td className="px-4 py-3 text-2xl">{cat.icon}</td>
-                      <td className="px-4 py-3 font-medium text-[#f0f4ff]">{cat.name}</td>
-                      <td className="px-4 py-3 text-[#6b7fa8]">{cat.courseCount}</td>
-                      <td className="px-4 py-3">
-                        <Button size="xs" variant="danger" onClick={() => setCatList(prev => prev.filter(c => c.id !== cat.id))}>Remove</Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-
-        <Card className="p-5 h-fit">
-          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Add Category</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm text-[#6b7fa8] mb-1 block">Icon (emoji)</label>
-              <input value={newIcon} onChange={e => setNewIcon(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff] text-center text-2xl"
-                maxLength={2} />
-            </div>
-            <div>
-              <label className="text-sm text-[#6b7fa8] mb-1 block">Category Name</label>
-              <input value={newCat} onChange={e => setNewCat(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]"
-                placeholder="e.g. Artificial Intelligence" />
-            </div>
-            <Button className="w-full justify-center" onClick={handleAdd} disabled={!newCat.trim()}>Add Category</Button>
-          </div>
-        </Card>
-      </div>
-    </DashboardLayout>
-  );
-}
-
-// ── Reports ──────────────────────────────────────────────────────────────────
-
-export function AdminReports() {
-  const { users, enrollments, submissions, assignments } = useApp();
-
-  const completionRate = enrollments.length ? Math.round(enrollments.filter(e => e.progress === 100).length / enrollments.length * 100) : 0;
-  const avgGrade = averageGradePercent(submissions, assignments);
-  const trend = monthlyEnrollments(enrollments);
-
-  return (
-    <DashboardLayout>
-      <SectionHeader title="Reports & Analytics" description="Comprehensive platform reports" />
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Users" value={users.length} icon="👥" color="blue" />
-        <StatCard label="Total Enrollments" value={enrollments.length} icon="📋" color="green" />
-        <StatCard label="Completion Rate" value={`${completionRate}%`} icon="✅" color="yellow" />
-        <StatCard label="Avg Grade" value={`${avgGrade}%`} icon="📊" color="purple" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-        <Card className="p-5">
-          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Enrolments by Month</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={trend}>
-              <XAxis dataKey="month" stroke="#4a5a7a" tick={{ fontSize: 11 }} />
-              <YAxis stroke="#4a5a7a" tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="students" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card className="p-5">
-          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Platform Activity <span className="text-xs font-normal text-[#4a5a7a]">(sample data)</span></h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={ACTIVITY_DATA}>
-              <XAxis dataKey="week" stroke="#4a5a7a" tick={{ fontSize: 11 }} />
-              <YAxis stroke="#4a5a7a" tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }} />
-              <Line type="monotone" dataKey="minutes" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
-      <Card className="p-5">
-        <h3 className="font-display font-bold text-[#f0f4ff] mb-1">Downloadable reports</h3>
-        <p className="text-sm text-[#6b7fa8]">Users, course performance and assessment result reports with CSV export are added with the backend.</p>
-      </Card>
-    </DashboardLayout>
-  );
-}
-
-// ── Activity Logs ──────────────────────────────────────────────────────────
-
-const FULL_LOGS = [
-  { time: '2024-07-23 14:32:01', user: 'student@cloudlearn.com', action: 'User logged in', resource: 'Authentication', ip: '192.168.1.1', status: 'success' },
-  { time: '2024-07-23 14:28:15', user: 'instructor@cloudlearn.com', action: 'Course published', resource: 'Course: Python Bootcamp', ip: '10.0.0.5', status: 'success' },
-  { time: '2024-07-23 14:25:33', user: 'student@cloudlearn.com', action: 'Assignment submitted', resource: 'Assignment: Python Functions', ip: '192.168.1.1', status: 'success' },
-  { time: '2024-07-23 14:15:22', user: 'emily.r@example.com', action: 'Enrolled in course', resource: 'Course: Data Science', ip: '172.16.0.3', status: 'success' },
-  { time: '2024-07-23 13:50:11', user: 'unknown@attacker.com', action: 'Failed login (3rd attempt)', resource: 'Authentication', ip: '45.33.32.156', status: 'failed' },
-  { time: '2024-07-23 13:45:08', user: 'admin@cloudlearn.com', action: 'Modified user role', resource: 'User: priya.p', ip: '192.168.1.100', status: 'success' },
-  { time: '2024-07-23 13:30:45', user: 'james.o@example.com', action: 'Created quiz', resource: 'Quiz: Marketing Fundamentals', ip: '10.0.0.8', status: 'success' },
-  { time: '2024-07-23 13:15:22', user: 'david.k@example.com', action: 'Completed lesson', resource: 'Lesson: React Hooks', ip: '192.168.1.45', status: 'success' },
-  { time: '2024-07-23 12:58:19', user: 'admin@cloudlearn.com', action: 'System backup initiated', resource: 'System', ip: '192.168.1.100', status: 'success' },
-  { time: '2024-07-23 12:45:33', user: 'lisa.t@example.com', action: 'Graded assignment', resource: 'Assignment: Threat Modeling', ip: '10.0.0.12', status: 'success' },
-];
-
-export function ActivityLogs() {
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
-
-  const filtered = FULL_LOGS.filter(l => {
-    if (filter !== 'all' && l.status !== filter) return false;
-    if (search && !l.action.toLowerCase().includes(search.toLowerCase()) && !l.user.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
-  return (
-    <DashboardLayout>
-      <SectionHeader title="Activity Logs" description="Sample entries only: live event logging is added with the backend" />
-
-      <div className="flex flex-wrap gap-3 mb-5">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search logs..." className="flex-1 min-w-48" />
-        <select value={filter} onChange={e => setFilter(e.target.value)}
-          className="px-3 py-2 bg-[#111827] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]">
-          <option value="all">All Events</option>
-          <option value="success">Successful</option>
-          <option value="failed">Failed / Security</option>
-        </select>
-      </div>
-
+      <SectionHeader title="Categories" description="Course categories available to instructors" />
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[rgba(255,255,255,0.07)]">
-                {['Timestamp', 'User', 'Action', 'Resource', 'IP', 'Status'].map(h => (
+                {['Icon', 'Category', 'Courses', 'Published'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[#6b7fa8] uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((l, i) => (
-                <tr key={i} className={`border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)] ${l.status === 'failed' ? 'bg-red-500/3' : ''}`}>
-                  <td className="px-4 py-3 font-mono text-xs text-[#6b7fa8]">{l.time}</td>
-                  <td className="px-4 py-3 text-[#a0b4d0]">{l.user}</td>
-                  <td className="px-4 py-3 text-[#f0f4ff]">{l.action}</td>
-                  <td className="px-4 py-3 text-[#6b7fa8]">{l.resource}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#4a5a7a]">{l.ip}</td>
-                  <td className="px-4 py-3"><Badge variant={l.status === 'success' ? 'green' : 'red'}>{l.status}</Badge></td>
-                </tr>
-              ))}
-              {filtered.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-[#4a5a7a]">No log entries match your filter</td></tr>}
+              {CATEGORIES.map(cat => {
+                const inCat = courses.filter(c => c.category === cat.name);
+                return (
+                  <tr key={cat.id} className="border-b border-[rgba(255,255,255,0.04)]">
+                    <td className="px-4 py-3 text-2xl">{cat.icon}</td>
+                    <td className="px-4 py-3 font-medium text-[#f0f4ff]">{cat.name}</td>
+                    <td className="px-4 py-3 text-[#6b7fa8]">{inCat.length}</td>
+                    <td className="px-4 py-3 text-[#6b7fa8]">{inCat.filter(c => c.isPublished).length}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -282,263 +127,310 @@ export function ActivityLogs() {
   );
 }
 
-// ── Backup & Recovery ──────────────────────────────────────────────────────
+// ── Reports ──────────────────────────────────────────────────────────────────
 
-const BACKUPS = [
-  { id: 'bk1', name: 'Full Backup', date: '2024-07-23 03:00:00', size: '2.4 GB', type: 'Automatic', status: 'completed' },
-  { id: 'bk2', name: 'Full Backup', date: '2024-07-22 03:00:00', size: '2.3 GB', type: 'Automatic', status: 'completed' },
-  { id: 'bk3', name: 'Manual Backup', date: '2024-07-20 14:32:00', size: '2.2 GB', type: 'Manual', status: 'completed' },
-  { id: 'bk4', name: 'Full Backup', date: '2024-07-21 03:00:00', size: '2.3 GB', type: 'Automatic', status: 'completed' },
-  { id: 'bk5', name: 'Partial Backup', date: '2024-07-19 03:00:00', size: '1.1 GB', type: 'Automatic', status: 'partial' },
+interface Report { report: string; title: string; generatedAt: string; summary: Record<string, unknown>; columns: { key: string; label: string }[]; rows: Record<string, unknown>[] }
+const REPORTS = [
+  { id: 'users', label: 'Users' },
+  { id: 'course-performance', label: 'Course Performance' },
+  { id: 'assessment-results', label: 'Assessment Results' },
 ];
+const humanize = (k: string) => k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
+const show = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : String(v));
 
-export function BackupRecovery() {
-  const { addToast } = useApp();
-  const [running, setRunning] = useState(false);
+export function AdminReports() {
+  const [tab, setTab] = useState('users');
+  const [data, setData] = useState<Report | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const startBackup = async () => {
-    setRunning(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setRunning(false);
-    addToast('Simulated backup recorded (no data was written)', 'info');
-  };
+  useEffect(() => {
+    let live = true;
+    setLoading(true); setError(''); setData(null);
+    api.get<Report>(`/reports/${tab}`)
+      .then(r => { if (live) setData(r); })
+      .catch(e => { if (live) setError(errorMessage(e)); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [tab]);
 
   return (
     <DashboardLayout>
-      <SectionHeader title="Backup & Recovery" description="Simulated in the prototype: real backup and restore are added with the backend" />
+      <SectionHeader title="Reports" description="Generated from live platform data. Download any report as CSV."
+        action={<a href={`/api/reports/${tab}?format=csv`} className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white" download>⬇ Download CSV</a>} />
+      <div className="mb-5"><Tabs tabs={REPORTS} active={tab} onChange={setTab} /></div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <StatCard label="Last Backup" value="Sample" icon="💾" color="green" sub="simulated data" />
-        <StatCard label="Total Backups" value={BACKUPS.length} icon="📦" color="blue" sub="30-day retention" />
-        <StatCard label="Storage Used" value="Sample" icon="☁️" color="purple" sub="simulated data" />
-      </div>
+      {loading && <div className="flex justify-center py-16" role="status"><Spinner size={28} /></div>}
+      {error && <div role="alert" className="p-4 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-300">{error}</div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2">
+      {data && (
+        <>
+          {Object.keys(data.summary || {}).length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+              {Object.entries(data.summary).map(([k, v]) => <StatCard key={k} label={humanize(k)} value={show(v)} icon="📊" color="blue" />)}
+            </div>
+          )}
           <Card>
             <div className="p-4 border-b border-[rgba(255,255,255,0.07)] flex items-center justify-between">
-              <h3 className="font-display font-bold text-[#f0f4ff]">Backup History</h3>
-              <Button size="sm" onClick={startBackup} disabled={running}>
-                {running ? '⏳ Running...' : '▶ Start Backup'}
-              </Button>
+              <h3 className="font-display font-bold text-[#f0f4ff]">{data.title}</h3>
+              <span className="text-xs text-[#4a5a7a]">Generated {new Date(data.generatedAt).toLocaleString()}</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[rgba(255,255,255,0.07)]">
-                    {['Name', 'Date', 'Size', 'Type', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[#6b7fa8] uppercase tracking-wide">{h}</th>
-                    ))}
+                    {data.columns.map(c => <th key={c.key} className="text-left px-4 py-3 text-xs font-semibold text-[#6b7fa8] uppercase tracking-wide whitespace-nowrap">{c.label}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {BACKUPS.map(b => (
-                    <tr key={b.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
-                      <td className="px-4 py-3 font-medium text-[#f0f4ff]">{b.name}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-[#6b7fa8]">{b.date}</td>
-                      <td className="px-4 py-3 text-[#a0b4d0]">{b.size}</td>
-                      <td className="px-4 py-3"><Badge variant={b.type === 'Manual' ? 'blue' : 'gray'}>{b.type}</Badge></td>
-                      <td className="px-4 py-3"><Badge variant={b.status === 'completed' ? 'green' : 'yellow'}>{b.status}</Badge></td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <Button size="xs" variant="ghost" onClick={() => addToast('Simulated: restore is not available in the prototype', 'info')}>Restore</Button>
-                        </div>
-                      </td>
+                  {data.rows.map((r, i) => (
+                    <tr key={i} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
+                      {data.columns.map(c => <td key={c.key} className="px-4 py-2.5 text-[#a0b4d0] whitespace-nowrap">{show(r[c.key])}</td>)}
                     </tr>
                   ))}
+                  {data.rows.length === 0 && <tr><td colSpan={data.columns.length} className="px-4 py-8 text-center text-[#4a5a7a]">No data yet</td></tr>}
                 </tbody>
               </table>
             </div>
           </Card>
-        </div>
+        </>
+      )}
+    </DashboardLayout>
+  );
+}
 
-        <div className="space-y-4">
-          <Card className="p-5">
-            <h3 className="font-display font-bold text-[#f0f4ff] mb-4">System Status</h3>
-            <div className="space-y-3">
-              {[
-                { label: 'Database', status: 'operational', latency: '12ms' },
-                { label: 'File Storage', status: 'operational', latency: '45ms' },
-                { label: 'CDN', status: 'operational', latency: '8ms' },
-                { label: 'Email Service', status: 'operational', latency: '120ms' },
-                { label: 'Backup Service', status: 'operational', latency: 'N/A' },
-              ].map(s => (
-                <div key={s.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-emerald-500 rounded-full" />
-                    <span className="text-sm text-[#a0b4d0]">{s.label}</span>
-                  </div>
-                  <span className="font-mono text-xs text-[#4a5a7a]">{s.latency}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
+// ── Activity Logs ──────────────────────────────────────────────────────────
 
-          <Card className="p-5">
-            <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Backup Schedule</h3>
-            <div className="space-y-2 text-sm text-[#a0b4d0]">
-              <div className="flex justify-between"><span>Daily</span><span className="text-[#6b7fa8]">03:00 UTC</span></div>
-              <div className="flex justify-between"><span>Weekly</span><span className="text-[#6b7fa8]">Sunday 02:00 UTC</span></div>
-              <div className="flex justify-between"><span>Retention</span><span className="text-[#6b7fa8]">30 days</span></div>
-              <div className="flex justify-between"><span>Encryption</span><span className="text-emerald-400">AES-256</span></div>
-            </div>
-          </Card>
-        </div>
+export interface LogRow { id: number; at: string; user: string | null; action: string; detail: string | null; ip: string | null; status: string }
+const PAGE = 50;
+
+export function ActivityLogs() {
+  const [search, setSearch] = useState('');
+  const [q, setQ] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [offset, setOffset] = useState(0);
+  const [logs, setLogs] = useState<LogRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // debounce the search box so we do not query on every keystroke
+  useEffect(() => { const t = setTimeout(() => { setQ(search); setOffset(0); }, 300); return () => clearTimeout(t); }, [search]);
+
+  useEffect(() => {
+    let live = true;
+    setLoading(true); setError('');
+    const p = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
+    if (filter !== 'all') p.set('status', filter);
+    if (q) p.set('q', q);
+    api.get(`/admin/activity-logs?${p}`)
+      .then(r => { if (live) { setLogs(r.logs); setTotal(r.total); } })
+      .catch(e => { if (live) setError(errorMessage(e)); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [filter, q, offset]);
+
+  return (
+    <DashboardLayout>
+      <SectionHeader title="Activity Logs" description={`${total} recorded events`} />
+
+      <div className="flex flex-wrap gap-3 mb-5">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search logs..." className="flex-1 min-w-48" />
+        <select value={filter} onChange={e => { setFilter(e.target.value); setOffset(0); }} aria-label="Filter by status"
+          className="px-3 py-2 bg-[#111827] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]">
+          <option value="all">All Events</option>
+          <option value="success">Successful</option>
+          <option value="failed">Failed / Security</option>
+        </select>
       </div>
+
+      {error && <div role="alert" className="mb-4 p-4 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-300">{error}</div>}
+
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[rgba(255,255,255,0.07)]">
+                {['Timestamp', 'User', 'Action', 'Detail', 'IP', 'Status'].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[#6b7fa8] uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map(l => (
+                <tr key={l.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
+                  <td className="px-4 py-3 font-mono text-xs text-[#6b7fa8] whitespace-nowrap">{l.at.replace('T', ' ').slice(0, 19)}</td>
+                  <td className="px-4 py-3 text-[#a0b4d0]">{l.user || '—'}</td>
+                  <td className="px-4 py-3 text-[#f0f4ff]">{l.action}</td>
+                  <td className="px-4 py-3 text-[#6b7fa8]">{l.detail || ''}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-[#4a5a7a]">{l.ip}</td>
+                  <td className="px-4 py-3"><Badge variant={l.status === 'success' ? 'green' : 'red'}>{l.status}</Badge></td>
+                </tr>
+              ))}
+              {!loading && logs.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-[#4a5a7a]">No log entries match your filter</td></tr>}
+              {loading && <tr><td colSpan={6} className="px-4 py-8 text-center text-[#4a5a7a]">Loading…</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {total > PAGE && (
+          <div className="p-3 flex items-center justify-between border-t border-[rgba(255,255,255,0.07)] text-sm text-[#6b7fa8]">
+            <span>{offset + 1}–{Math.min(offset + PAGE, total)} of {total}</span>
+            <div className="flex gap-2">
+              <Button size="xs" variant="secondary" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>Previous</Button>
+              <Button size="xs" variant="secondary" disabled={offset + PAGE >= total} onClick={() => setOffset(offset + PAGE)}>Next</Button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </DashboardLayout>
+  );
+}
+
+// ── Backup & Recovery ──────────────────────────────────────────────────────
+
+interface BackupInfo { name: string; createdAt: string; kind: string; sizeBytes: number; users: number; courses: number }
+const fmtBytes = (b: number) => b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
+
+export function BackupRecovery() {
+  const { addToast, logout } = useApp();
+  const [backups, setBackups] = useState<BackupInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<BackupInfo | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BackupInfo | null>(null);
+
+  const load = useCallback(async () => {
+    try { setBackups((await api.get('/admin/backups')).backups); setError(''); } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const create = async () => {
+    setBusy(true);
+    try { await api.post('/admin/backups'); addToast('Backup created'); await load(); } catch (e) { addToast(errorMessage(e), 'error'); } finally { setBusy(false); }
+  };
+  const restore = async () => {
+    if (!restoreTarget) return;
+    setBusy(true);
+    try {
+      await api.post(`/admin/backups/${restoreTarget.name}/restore`, { confirm: true });
+      addToast('Backup restored. Everyone has been signed out; please sign in again.', 'success');
+      setRestoreTarget(null);
+      await logout();
+    } catch (e) { addToast(errorMessage(e), 'error'); setRestoreTarget(null); } finally { setBusy(false); }
+  };
+  const remove = async () => {
+    if (!deleteTarget) return;
+    try { await api.del(`/admin/backups/${deleteTarget.name}`); addToast('Backup deleted'); await load(); } catch (e) { addToast(errorMessage(e), 'error'); }
+    setDeleteTarget(null);
+  };
+
+  const latest = backups[0];
+  const totalBytes = backups.reduce((a, b) => a + b.sizeBytes, 0);
+
+  return (
+    <DashboardLayout>
+      <SectionHeader title="Backup & Recovery" description="Snapshots of the database and uploaded files"
+        action={<Button onClick={create} disabled={busy}>{busy ? 'Working…' : '+ Create backup'}</Button>} />
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <StatCard label="Last Backup" value={latest ? new Date(latest.createdAt).toLocaleDateString() : 'None'} icon="💾" color="green" sub={latest ? new Date(latest.createdAt).toLocaleTimeString() : 'Create one now'} />
+        <StatCard label="Total Backups" value={backups.length} icon="📦" color="blue" />
+        <StatCard label="Storage Used" value={fmtBytes(totalBytes)} icon="☁️" color="purple" />
+      </div>
+
+      {error && <div role="alert" className="mb-4 p-4 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-300">{error}</div>}
+
+      <Card>
+        <div className="p-4 border-b border-[rgba(255,255,255,0.07)]"><h3 className="font-display font-bold text-[#f0f4ff]">Backup History</h3></div>
+        {loading ? <div className="flex justify-center py-10" role="status"><Spinner size={24} /></div> : backups.length === 0 ? (
+          <EmptyState icon="💾" title="No backups yet" description="Create a backup before making large changes." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[rgba(255,255,255,0.07)]">
+                  {['Created', 'Type', 'Size', 'Users', 'Courses', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[#6b7fa8] uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {backups.map(b => (
+                  <tr key={b.name} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
+                    <td className="px-4 py-3 font-mono text-xs text-[#a0b4d0]">{new Date(b.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3"><Badge variant={b.kind === 'manual' ? 'blue' : 'gray'}>{b.kind === 'pre-restore' ? 'Safety (pre-restore)' : b.kind}</Badge></td>
+                    <td className="px-4 py-3 text-[#a0b4d0]">{fmtBytes(b.sizeBytes)}</td>
+                    <td className="px-4 py-3 text-[#6b7fa8]">{b.users}</td>
+                    <td className="px-4 py-3 text-[#6b7fa8]">{b.courses}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <Button size="xs" variant="ghost" disabled={busy} onClick={() => setRestoreTarget(b)}>Restore</Button>
+                        <Button size="xs" variant="ghost" disabled={busy} onClick={() => setDeleteTarget(b)}>Delete</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <ConfirmDialog open={!!restoreTarget} onClose={() => setRestoreTarget(null)} onConfirm={restore} variant="danger" confirmLabel="Restore and sign everyone out"
+        title="Restore this backup?"
+        message={`This replaces ALL current data (users, courses, grades, uploads) with the backup from ${restoreTarget ? new Date(restoreTarget.createdAt).toLocaleString() : ''}. Anything changed since then is lost, and every user, including you, is signed out. A safety backup of the current state is taken first.`} />
+      <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={remove} confirmLabel="Delete backup"
+        title="Delete this backup?" message="The backup files are permanently removed." />
     </DashboardLayout>
   );
 }
 
 // ── System Settings ──────────────────────────────────────────────────────────
+// Read-only: there are no editable platform settings in the MVP; this reports what is actually enforced.
 
 export function SystemSettings() {
-  const { addToast } = useApp();
-  const [platformName, setPlatformName] = useState('CloudLearn');
-  const [maxStudents, setMaxStudents] = useState('50000');
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [smsNotifs, setSmsNotifs] = useState(false);
-  const [savedTab, setSavedTab] = useState('general');
-
-  const handleSave = () => { addToast('Saved for this session only (prototype)', 'info'); };
-
   return (
     <DashboardLayout>
-      <SectionHeader title="System Settings" description="Configure platform-wide settings" />
-
-      <div className="flex gap-2 mb-6">
-        {['general', 'notifications', 'security', 'cloud'].map(t => (
-          <button key={t} onClick={() => setSavedTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${savedTab === t ? 'bg-blue-600 text-white' : 'text-[#6b7fa8] hover:text-white'}`}>
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {savedTab === 'general' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <Card className="p-5">
-            <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Platform Configuration</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-[#6b7fa8] block mb-1">Platform Name</label>
-                <input value={platformName} onChange={e => setPlatformName(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]" />
-              </div>
-              <div>
-                <label className="text-sm text-[#6b7fa8] block mb-1">Max Students per Course</label>
-                <input value={maxStudents} onChange={e => setMaxStudents(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]" />
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <div className="text-sm font-medium text-[#f0f4ff]">Maintenance Mode</div>
-                  <div className="text-xs text-[#4a5a7a]">Temporarily disable the platform</div>
-                </div>
-                <button onClick={() => setMaintenanceMode(m => !m)}
-                  className={`w-10 h-5 rounded-full transition-colors relative ${maintenanceMode ? 'bg-red-600' : 'bg-[#1a2540]'}`}>
-                  <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${maintenanceMode ? 'translate-x-5.5' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-              <Button onClick={handleSave}>Save Settings</Button>
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Platform Info</h3>
-            <div className="space-y-3 text-sm">
-              {[
-                { label: 'Version', value: '0.1.0 (prototype)' },
-                { label: 'Environment', value: 'Demonstration' },
-                { label: 'Data store', value: 'Browser localStorage (prototype)' },
-                { label: 'Backend', value: 'Not connected' },
-              ].map(i => (
-                <div key={i.label} className="flex justify-between">
-                  <span className="text-[#6b7fa8]">{i.label}</span>
-                  <span className="font-mono text-[#f0f4ff]">{i.value}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {savedTab === 'notifications' && (
-        <Card className="p-5 max-w-lg">
-          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Notification Settings</h3>
-          <div className="space-y-4">
-            {[
-              { label: 'Email Notifications', value: emailNotifs, set: setEmailNotifs },
-              { label: 'SMS Notifications', value: smsNotifs, set: setSmsNotifs },
-            ].map(n => (
-              <div key={n.label} className="flex items-center justify-between py-2 border-b border-[rgba(255,255,255,0.07)]">
-                <span className="text-sm font-medium text-[#f0f4ff]">{n.label}</span>
-                <button onClick={() => n.set((v: boolean) => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors relative ${n.value ? 'bg-blue-600' : 'bg-[#1a2540]'}`}>
-                  <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${n.value ? 'translate-x-5.5' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-            ))}
-            <Button onClick={handleSave}>Save Preferences</Button>
-          </div>
-        </Card>
-      )}
-
-      {savedTab === 'security' && (
-        <Card className="p-5 max-w-lg">
-          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Security Settings</h3>
-          <div className="space-y-4 text-sm">
-            {[
-              { label: 'Role-based access control', enabled: true },
-              { label: 'Password hashing', enabled: false },
-              { label: 'Login throttling', enabled: false },
-              { label: 'HTTPS / secure cookies', enabled: false },
-            ].map(s => (
-              <div key={s.label} className="flex items-center justify-between py-2 border-b border-[rgba(255,255,255,0.07)]">
-                <span className="text-[#f0f4ff]">{s.label}</span>
-                <Badge variant={s.enabled ? 'green' : 'gray'}>{s.enabled ? 'Active' : 'Planned (backend)'}</Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {savedTab === 'cloud' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <SectionHeader title="System" description="Security controls enforced by the server" />
+      <Card className="p-5 max-w-lg">
+        <div className="space-y-4 text-sm">
           {[
-            { title: 'Cloud Storage', icon: '☁️', status: 'Simulated', provider: 'Not connected', usage: 'Uploads are stored with the backend' },
-            { title: 'Database', icon: '🗄️', status: 'Simulated', provider: 'Browser localStorage', usage: 'Replaced by the server database' },
-          ].map(s => (
-            <Card key={s.title} className="p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">{s.icon}</span>
-                <div>
-                  <h3 className="font-display font-bold text-[#f0f4ff]">{s.title}</h3>
-                  <Badge variant="yellow">{s.status}</Badge>
-                </div>
-              </div>
-              <div className="text-sm text-[#6b7fa8] space-y-1">
-                <div>Provider: {s.provider}</div>
-                <div>Usage: {s.usage}</div>
-              </div>
-            </Card>
+            ['Role-based access control', 'Every API route checks the signed-in role'],
+            ['Password hashing', 'bcrypt; passwords are never stored or returned'],
+            ['Login throttling', '5 failed attempts per account and address in 15 minutes'],
+            ['Server-side sessions', 'httpOnly cookie, revoked on deactivation and password change'],
+            ['Upload limits', '10 MB per file, allowed types only'],
+          ].map(([label, note]) => (
+            <div key={label} className="flex items-center justify-between gap-3 py-2 border-b border-[rgba(255,255,255,0.07)]">
+              <div><div className="text-[#f0f4ff]">{label}</div><div className="text-xs text-[#4a5a7a]">{note}</div></div>
+              <Badge variant="green">Active</Badge>
+            </div>
           ))}
         </div>
-      )}
+      </Card>
     </DashboardLayout>
   );
 }
 
-// ── Instructor Profile (reuse student profile) ──────────────────────────────
+// ── Instructor Profile ──────────────────────────────────────────────────────
 
 export function InstructorProfile() {
-  const { currentUser, updateUser } = useApp();
+  const { currentUser, updateProfile, changePassword } = useApp();
+  const [name, setName] = useState(currentUser?.name || '');
+  const [bio, setBio] = useState(currentUser?.bio || '');
+  const [phone, setPhone] = useState(currentUser?.phone || '');
+  const [location, setLocation] = useState(currentUser?.location || '');
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   if (!currentUser) return null;
 
-  const [name, setName] = useState(currentUser.name);
-  const [bio, setBio] = useState(currentUser.bio);
-  const [phone, setPhone] = useState(currentUser.phone);
-  const [location, setLocation] = useState(currentUser.location);
+  const savePassword = async () => {
+    const r = await changePassword(cur, next);
+    setPwMsg({ ok: r.ok, text: r.ok ? 'Password updated.' : r.error || 'Could not update password' });
+    if (r.ok) { setCur(''); setNext(''); }
+  };
 
   return (
     <DashboardLayout>
@@ -551,29 +443,27 @@ export function InstructorProfile() {
             <div>
               <div className="font-bold text-[#f0f4ff]">{currentUser.name}</div>
               <div className="text-sm text-[#6b7fa8]">{currentUser.email}</div>
-              <Badge variant="yellow" className="mt-1">Instructor</Badge>
+              <Badge variant="yellow" className="mt-1">{currentUser.role === 'admin' ? 'Administrator' : 'Instructor'}</Badge>
             </div>
           </div>
           <div className="space-y-3">
-            <div>
-              <label className="text-sm text-[#6b7fa8] block mb-1">Name</label>
-              <input value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]" />
-            </div>
-            <div>
-              <label className="text-sm text-[#6b7fa8] block mb-1">Bio</label>
-              <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff] resize-none" />
-            </div>
+            <Field label="Name"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
+            <Field label="Bio"><Textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-[#6b7fa8] block mb-1">Phone</label>
-                <input value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]" />
-              </div>
-              <div>
-                <label className="text-sm text-[#6b7fa8] block mb-1">Location</label>
-                <input value={location} onChange={e => setLocation(e.target.value)} className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]" />
-              </div>
+              <Field label="Phone"><Input value={phone} onChange={e => setPhone(e.target.value)} /></Field>
+              <Field label="Location"><Input value={location} onChange={e => setLocation(e.target.value)} /></Field>
             </div>
-            <Button onClick={() => updateUser(currentUser.id, { name, bio, phone, location })}>Save Changes</Button>
+            <Button onClick={() => updateProfile({ name, bio, phone, location })} disabled={!name.trim()}>Save Changes</Button>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Change Password</h3>
+          <div className="space-y-3">
+            <Field label="Current password"><Input type="password" autoComplete="current-password" value={cur} onChange={e => setCur(e.target.value)} /></Field>
+            <Field label="New password" hint="6 to 72 characters"><Input type="password" autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} /></Field>
+            {pwMsg && <div role={pwMsg.ok ? 'status' : 'alert'} className={`text-sm ${pwMsg.ok ? 'text-emerald-400' : 'text-red-300'}`}>{pwMsg.text}</div>}
+            <Button onClick={savePassword} disabled={!cur || next.length < 6}>Update password</Button>
           </div>
         </Card>
       </div>

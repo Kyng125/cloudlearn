@@ -1,7 +1,6 @@
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, StatCard, SectionHeader } from '../../components/UI';
-import { ACTIVITY_DATA } from '../../data';
 import { monthlyEnrollments, averageGradePercent } from '../../lib/derive';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
@@ -126,19 +125,6 @@ export default function Analytics() {
           </div>
         </Card>
       </div>
-
-      {/* Activity */}
-      <Card className="p-5">
-        <h3 className="font-display font-bold text-[#f0f4ff] mb-4">Student Activity <span className="text-xs font-normal text-[#4a5a7a]">(sample data)</span></h3>
-        <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={ACTIVITY_DATA}>
-            <XAxis dataKey="week" stroke="#4a5a7a" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#4a5a7a" tick={{ fontSize: 11 }} />
-            <Tooltip contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }} />
-            <Bar dataKey="minutes" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Minutes" />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
     </DashboardLayout>
   );
 }

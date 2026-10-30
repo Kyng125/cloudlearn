@@ -2,18 +2,19 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, Button, Badge, Tabs, EmptyState, Modal, Field, Textarea, SectionHeader } from '../../components/UI';
-import { type QuizAttempt } from '../../data';
+import type { LiveAttempt, AttemptQuestion } from '../../types';
 
 // ── Assignments ──────────────────────────────────────────────────────────
 
 export function Assignments() {
-  const { currentUser, enrollments, assignments, submissions, submitAssignment, getCourseById } = useApp();
-  if (!currentUser) return null;
-
+  const { currentUser, enrollments, assignments, submissions, submitAssignment, getCourseById, dataReady } = useApp();
   const [tab, setTab] = useState('pending');
+  const [busy, setBusy] = useState(false);
   const [submitModal, setSubmitModal] = useState<string | null>(null);
   const [submitText, setSubmitText] = useState('');
-  const [submitFile, setSubmitFile] = useState('submission.pdf');
+  const [submitFile, setSubmitFile] = useState<File | null>(null);
+  if (!currentUser) return null;
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
 
   const myEnrollments = enrollments.filter(e => e.studentId === currentUser.id);
   const courseIds = myEnrollments.map(e => e.courseId);
@@ -34,12 +35,14 @@ export function Assignments() {
     return true;
   });
 
-  const handleSubmit = () => {
-    if (!submitModal || !submitText.trim()) return;
-    submitAssignment(submitModal, submitText, submitFile);
-    setSubmitModal(null);
-    setSubmitText('');
+  const handleSubmit = async () => {
+    if (!submitModal || !submitFile || busy) return;
+    setBusy(true);
+    const ok = await submitAssignment(submitModal, submitText, submitFile);
+    setBusy(false);
+    if (ok) { setSubmitModal(null); setSubmitText(''); setSubmitFile(null); }
   };
+  const openSubmit = (id: string) => { setSubmitText(''); setSubmitFile(null); setSubmitModal(id); };
 
   return (
     <DashboardLayout>
@@ -63,9 +66,9 @@ export function Assignments() {
             const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
             return (
               <Card key={a.id} className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <h3 className="font-display font-bold text-[#f0f4ff]">{a.title}</h3>
                       {a.submission?.isLate && <Badge variant="red">Late</Badge>}
                       {!a.submission && a.isLate && <Badge variant="red">Overdue</Badge>}
@@ -90,9 +93,9 @@ export function Assignments() {
                     )}
 
                     {a.submission?.status === 'submitted' && (
-                      <div className="mt-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg flex items-center gap-2">
+                      <div className="mt-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg flex flex-wrap items-center gap-2">
                         <span className="text-blue-400">📎</span>
-                        <span className="text-sm text-[#a0b4d0]">{a.submission.fileName} — submitted {new Date(a.submission.submittedAt).toLocaleDateString()}</span>
+                        <a className="text-sm text-blue-400 underline break-all" href={`/api/submissions/${a.submission.id}/download`}>{a.submission.fileName}</a><span className="text-sm text-[#a0b4d0]"> — submitted {new Date(a.submission.submittedAt).toLocaleDateString()}</span>
                         <Badge variant="blue">Pending Review</Badge>
                       </div>
                     )}
@@ -100,11 +103,16 @@ export function Assignments() {
 
                   <div className="shrink-0">
                     {!a.submission && (
-                      <Button size="sm" variant={a.isLate ? 'danger' : 'primary'} onClick={() => setSubmitModal(a.id)}>
+                      <Button size="sm" variant={a.isLate ? 'danger' : 'primary'} onClick={() => openSubmit(a.id)}>
                         {a.isLate ? 'Submit Late' : 'Submit'}
                       </Button>
                     )}
-                    {a.submission?.status === 'submitted' && <Badge variant="blue">Submitted</Badge>}
+                    {a.submission?.status === 'submitted' && (
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant="blue">Submitted</Badge>
+                        <Button size="sm" variant="secondary" onClick={() => openSubmit(a.id)}>Replace file</Button>
+                      </div>
+                    )}
                     {a.submission?.status === 'graded' && <Badge variant="green">Graded</Badge>}
                   </div>
                 </div>
@@ -118,15 +126,16 @@ export function Assignments() {
         <div className="space-y-4">
           <Field label="Your submission notes">
             <Textarea value={submitText} onChange={e => setSubmitText(e.target.value)} rows={5}
-              placeholder="Describe your approach, methodology, and key findings..." />
+              placeholder="Optional notes for your instructor..." />
           </Field>
-          <Field label="File name (simulated upload)">
-            <input value={submitFile} onChange={e => setSubmitFile(e.target.value)}
+          <Field label="File (max 10 MB)">
+            <input type="file" aria-label="Submission file" onChange={e => setSubmitFile(e.target.files?.[0] ?? null)}
               className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]" />
           </Field>
+          {submitModal && submissions.some(x => x.assignmentId === submitModal) && <p className="text-xs text-amber-400">You already submitted. Uploading again replaces it until it is graded.</p>}
           <div className="flex gap-3 justify-end">
             <Button variant="secondary" onClick={() => setSubmitModal(null)}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={!submitText.trim()}>Submit Assignment</Button>
+            <Button onClick={handleSubmit} disabled={!submitFile || busy}>{busy ? 'Uploading…' : 'Submit Assignment'}</Button>
           </div>
         </div>
       </Modal>
@@ -137,10 +146,10 @@ export function Assignments() {
 // ── Quiz List ──────────────────────────────────────────────────────────────
 
 export function QuizList() {
-  const { currentUser, enrollments, quizzes, quizAttempts, navigate, getCourseById } = useApp();
-  if (!currentUser) return null;
-
+  const { currentUser, enrollments, quizzes, quizAttempts, navigate, getCourseById, dataReady } = useApp();
   const [tab, setTab] = useState('available');
+  if (!currentUser) return null;
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
   const myEnrollments = enrollments.filter(e => e.studentId === currentUser.id);
   const courseIds = myEnrollments.map(e => e.courseId);
 
@@ -199,17 +208,18 @@ export function QuizList() {
 
                 <div className="flex flex-wrap gap-3 text-xs text-[#6b7fa8] mb-4">
                   <span>⏱ {q.duration} min</span>
-                  <span>❓ {q.questions.length} questions</span>
+                  <span>❓ {q.questionCount} questions</span>
                   <span>🎯 Pass: {q.passingScore}%</span>
                 </div>
 
-                {q.attempt ? (
-                  <div className="text-xs text-[#4a5a7a]">
+                {q.attempt && (
+                  <div className="text-xs text-[#4a5a7a] mb-3">
                     Completed {new Date(q.attempt.completedAt).toLocaleDateString()} · Score: {q.attempt.score}/{q.attempt.totalPoints} pts
                   </div>
-                ) : (
-                  <Button size="sm" onClick={() => navigate('student-quiz-take', { quizId: q.id })}>
-                    {q.isExam ? 'Start Exam' : 'Take Quiz'} →
+                )}
+                {(!q.attempt || !q.isExam) && (
+                  <Button size="sm" variant={q.attempt ? 'secondary' : 'primary'} onClick={() => navigate('student-quiz-take', { quizId: q.id })}>
+                    {q.attempt ? 'Retake Quiz' : q.isExam ? 'Start Exam' : 'Take Quiz'} →
                   </Button>
                 )}
               </Card>
@@ -223,113 +233,112 @@ export function QuizList() {
 
 // ── Quiz Taker ──────────────────────────────────────────────────────────────
 
+const fmtClock = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+
 export function QuizTaker() {
-  const { routeParams, quizzes, navigate, submitQuizAttempt, currentUser } = useApp();
+  const { routeParams, quizzes, navigate, startQuizAttempt, saveQuizAnswers, finishQuizAttempt, currentUser, dataReady } = useApp();
   const quiz = quizzes.find(q => q.id === routeParams.quizId);
 
+  const [live, setLive] = useState<{ attempt: LiveAttempt; questions: AttemptQuestion[] } | null>(null);
   const [answers, setAnswers] = useState<number[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(quiz ? quiz.duration * 60 : 0);
-  const [submitted, setSubmitted] = useState(false);
-  const [result, setResult] = useState<QuizAttempt | null>(null);
-  const [started, setStarted] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [result, setResult] = useState<LiveAttempt | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [finishing, setFinishing] = useState(false);
 
-  // Answers, start time and the submitted flag live in refs so that the timer-expiry
-  // submission always sees the latest answers (a stale closure used to submit them all blank).
   const answersRef = useRef<number[]>([]);
-  const startedAtRef = useRef(0);
+  const offsetRef = useRef(0);
   const submittedRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptId = live?.attempt.id;
 
-  const finish = () => {
-    if (!quiz || submittedRef.current) return;
+  const flush = () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    if (attemptId && !submittedRef.current) void saveQuizAnswers(attemptId, answersRef.current);
+  };
+
+  const finish = async () => {
+    if (!attemptId || submittedRef.current) return;
     submittedRef.current = true;
-    const finalAnswers = quiz.questions.map((_, i) => answersRef.current[i] ?? -1);
-    const attempt = submitQuizAttempt(quiz.id, finalAnswers, Math.round((Date.now() - startedAtRef.current) / 1000));
-    setResult(attempt);
-    setSubmitted(true);
+    setFinishing(true);
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    const r = await finishQuizAttempt(attemptId, answersRef.current);
+    setFinishing(false);
+    if (r) setResult(r); else submittedRef.current = false;
   };
   const finishRef = useRef(finish);
   finishRef.current = finish;
 
+  // Countdown is derived from the server deadline (corrected by the server/client clock offset), not counted locally.
   useEffect(() => {
-    if (!started || submitted) return;
-    const timer = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
-    return () => clearInterval(timer);
-  }, [started, submitted]);
+    if (!live || result) return;
+    const deadline = new Date(live.attempt.deadline).getTime();
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((deadline - (Date.now() + offsetRef.current)) / 1000));
+      setTimeLeft(left);
+      if (left === 0) void finishRef.current();
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [live, result]);
 
-  useEffect(() => {
-    if (started && !submitted && timeLeft === 0) finishRef.current();
-  }, [started, submitted, timeLeft]);
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
   if (!quiz || !currentUser) {
     return <DashboardLayout><EmptyState icon="😕" title="Quiz not found" action={<Button onClick={() => navigate('student-quiz')}>Back</Button>} /></DashboardLayout>;
   }
+
+  const start = async () => {
+    setStarting(true);
+    const r = await startQuizAttempt(quiz.id);
+    setStarting(false);
+    if (!r) return;
+    offsetRef.current = r.offsetMs;
+    const a = Array.from({ length: r.questions.length }, (_, i) => r.attempt.answers?.[i] ?? -1);
+    answersRef.current = a; setAnswers(a); setCurrentQ(0);
+    setLive({ attempt: r.attempt, questions: r.questions });
+  };
 
   const handleAnswer = (idx: number) => {
     const next = [...answersRef.current];
     next[currentQ] = idx;
     answersRef.current = next;
     setAnswers(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(flush, 800);
   };
 
-  const fmt = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
-  const pct = result ? Math.round((result.score / result.totalPoints) * 100) : 0;
-
-  if (!started) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-xl mx-auto">
-          <Card className="p-8 text-center">
-            <div className="text-5xl mb-4">{quiz.isExam ? '📋' : '❓'}</div>
-            <h1 className="font-display font-bold text-2xl text-[#f0f4ff] mb-2">{quiz.title}</h1>
-            <p className="text-[#a0b4d0] mb-6">{quiz.description}</p>
-            <div className="flex justify-center gap-6 text-sm text-[#6b7fa8] mb-8">
-              <div><div className="text-2xl font-bold text-[#f0f4ff]">{quiz.questions.length}</div><div>Questions</div></div>
-              <div><div className="text-2xl font-bold text-[#f0f4ff]">{quiz.duration}m</div><div>Duration</div></div>
-              <div><div className="text-2xl font-bold text-[#f0f4ff]">{quiz.passingScore}%</div><div>Pass Score</div></div>
-            </div>
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4 text-sm text-amber-400 mb-6 text-left">
-              ⚠️ Once started, the timer cannot be paused. Make sure you're in a quiet environment with a stable connection.
-            </div>
-            <div className="flex gap-3 justify-center">
-              <Button variant="secondary" onClick={() => navigate('student-quiz')}>Cancel</Button>
-              <Button onClick={() => { const blank = new Array(quiz.questions.length).fill(-1); answersRef.current = blank; startedAtRef.current = Date.now(); setAnswers(blank); setStarted(true); }}>
-                {quiz.isExam ? 'Start Exam' : 'Start Quiz'}
-              </Button>
-            </div>
-          </Card>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (submitted && result) {
+  if (result) {
+    const total = result.totalPoints ?? 0;
+    const score = result.score ?? 0;
+    const pct = total ? Math.round((score / total) * 100) : 0;
     return (
       <DashboardLayout>
         <div className="max-w-xl mx-auto">
           <Card className="p-8 text-center">
             <div className="text-5xl mb-4">{result.passed ? '🎉' : '😞'}</div>
-            <h1 className="font-display font-bold text-2xl text-[#f0f4ff] mb-2">
-              {result.passed ? 'Congratulations!' : 'Not quite there'}
-            </h1>
+            <h1 className="font-display font-bold text-2xl text-[#f0f4ff] mb-2">{result.passed ? 'Congratulations!' : 'Not quite there'}</h1>
             <div className="text-6xl font-display font-bold mb-2" style={{ color: result.passed ? '#10b981' : '#ef4444' }}>{pct}%</div>
             <Badge variant={result.passed ? 'green' : 'red'} className="mb-6">{result.passed ? 'Passed' : 'Failed'}</Badge>
             <div className="flex justify-center gap-8 text-sm text-[#6b7fa8] mb-6">
-              <div><div className="text-xl font-bold text-[#f0f4ff]">{result.score}/{result.totalPoints}</div><div>Score</div></div>
+              <div><div className="text-xl font-bold text-[#f0f4ff]">{score}/{total}</div><div>Score</div></div>
               <div><div className="text-xl font-bold text-[#f0f4ff]">{quiz.passingScore}%</div><div>Passing</div></div>
             </div>
             <h2 className="font-semibold text-[#f0f4ff] mb-4 text-left">Answer Review</h2>
             <div className="space-y-3 text-left mb-6">
-              {quiz.questions.map((q, i) => {
-                const userAns = result.answers[i];
-                const correct = userAns === q.correctIndex;
+              {(result.review ?? []).map((q, i) => {
+                const correct = q.yourAnswer === q.correctIndex;
                 return (
                   <div key={q.id} className={`p-3 rounded-lg border ${correct ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
                     <p className="text-sm font-medium text-[#f0f4ff] mb-1">{i + 1}. {q.text}</p>
                     <p className="text-xs text-[#6b7fa8]">
-                      Your answer: <span className={correct ? 'text-emerald-400' : 'text-red-400'}>{userAns >= 0 ? q.options[userAns] : 'Not answered'}</span>
+                      Your answer: <span className={correct ? 'text-emerald-400' : 'text-red-400'}>{q.yourAnswer >= 0 ? q.options[q.yourAnswer] : 'Not answered'}</span>
                     </p>
                     {!correct && <p className="text-xs text-emerald-400">Correct: {q.options[q.correctIndex]}</p>}
+                    {q.explanation && <p className="text-xs text-[#6b7fa8] mt-1">{q.explanation}</p>}
                   </div>
                 );
               })}
@@ -341,27 +350,52 @@ export function QuizTaker() {
     );
   }
 
-  const q = quiz.questions[currentQ];
+  if (!live) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-xl mx-auto">
+          <Card className="p-8 text-center">
+            <div className="text-5xl mb-4">{quiz.isExam ? '📋' : '❓'}</div>
+            <h1 className="font-display font-bold text-2xl text-[#f0f4ff] mb-2">{quiz.title}</h1>
+            <p className="text-[#a0b4d0] mb-6">{quiz.description}</p>
+            <div className="flex justify-center gap-6 text-sm text-[#6b7fa8] mb-8">
+              <div><div className="text-2xl font-bold text-[#f0f4ff]">{quiz.questionCount}</div><div>Questions</div></div>
+              <div><div className="text-2xl font-bold text-[#f0f4ff]">{quiz.duration}m</div><div>Duration</div></div>
+              <div><div className="text-2xl font-bold text-[#f0f4ff]">{quiz.passingScore}%</div><div>Pass Score</div></div>
+            </div>
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4 text-sm text-amber-400 mb-6 text-left">
+              ⚠️ The timer runs on the server and cannot be paused. If you leave, your saved answers are scored when time runs out.{quiz.isExam ? ' Exams allow one attempt.' : ''}
+            </div>
+            <div className="flex gap-3 justify-center">
+              <Button variant="secondary" onClick={() => navigate('student-quiz')}>Cancel</Button>
+              <Button onClick={start} disabled={starting}>{starting ? 'Starting…' : quiz.isExam ? 'Start Exam' : 'Start Quiz'}</Button>
+            </div>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const questions = live.questions;
+  const q = questions[currentQ];
   const answered = answers.filter(a => a !== undefined && a !== -1).length;
 
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="font-display font-bold text-xl text-[#f0f4ff]">{quiz.title}</h1>
-            <p className="text-sm text-[#6b7fa8]">Question {currentQ + 1} of {quiz.questions.length}</p>
+            <p className="text-sm text-[#6b7fa8]">Question {currentQ + 1} of {questions.length}</p>
           </div>
-          <div className={`font-mono text-lg font-bold px-4 py-2 rounded-xl border ${timeLeft < 300 ? 'text-red-400 border-red-500/30 bg-red-500/5' : 'text-[#f0f4ff] border-[rgba(255,255,255,0.1)]'}`}>
-            ⏱ {fmt(timeLeft)}
+          <div aria-label="Time remaining" className={`font-mono text-lg font-bold px-4 py-2 rounded-xl border ${timeLeft < 300 ? 'text-red-400 border-red-500/30 bg-red-500/5' : 'text-[#f0f4ff] border-[rgba(255,255,255,0.1)]'}`}>
+            ⏱ {fmtClock(timeLeft)}
           </div>
         </div>
 
-        {/* Progress bar */}
         <div className="flex gap-1 mb-5">
-          {quiz.questions.map((_, i) => (
-            <button key={i} onClick={() => setCurrentQ(i)}
+          {questions.map((_, i) => (
+            <button key={i} aria-label={`Go to question ${i + 1}`} onClick={() => setCurrentQ(i)}
               className={`flex-1 h-1.5 rounded-full transition-colors ${i === currentQ ? 'bg-blue-500' : answers[i] !== undefined && answers[i] !== -1 ? 'bg-emerald-500' : 'bg-[#1a2540]'}`} />
           ))}
         </div>
@@ -382,12 +416,12 @@ export function QuizTaker() {
         </Card>
 
         <div className="flex items-center justify-between">
-          <Button variant="secondary" onClick={() => setCurrentQ(q => Math.max(0, q - 1))} disabled={currentQ === 0}>← Previous</Button>
-          <span className="text-sm text-[#4a5a7a]">{answered}/{quiz.questions.length} answered</span>
-          {currentQ < quiz.questions.length - 1 ? (
-            <Button onClick={() => setCurrentQ(q => q + 1)}>Next →</Button>
+          <Button variant="secondary" onClick={() => setCurrentQ(c => Math.max(0, c - 1))} disabled={currentQ === 0}>← Previous</Button>
+          <span className="text-sm text-[#4a5a7a]">{answered}/{questions.length} answered</span>
+          {currentQ < questions.length - 1 ? (
+            <Button onClick={() => setCurrentQ(c => c + 1)}>Next →</Button>
           ) : (
-            <Button variant="success" onClick={finish}>Submit {quiz.isExam ? 'Exam' : 'Quiz'}</Button>
+            <Button variant="success" onClick={finish} disabled={finishing}>{finishing ? 'Submitting…' : `Submit ${quiz.isExam ? 'Exam' : 'Quiz'}`}</Button>
           )}
         </div>
       </div>

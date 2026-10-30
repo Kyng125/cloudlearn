@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, Button, Badge, ProgressBar, LevelBadge, Tabs, EmptyState, SectionHeader } from '../../components/UI';
-import { type Lesson } from '../../data';
+import { type Lesson } from '../../types';
 
 // ── My Courses ──────────────────────────────────────────────────────────
 
 export function MyCourses() {
-  const { currentUser, enrollments, navigate, getCourseById, getUserById } = useApp();
-  if (!currentUser) return null;
-
+  const { currentUser, enrollments, navigate, getCourseById, getUserById, dataReady } = useApp();
   const [tab, setTab] = useState('all');
+  if (!currentUser) return null;
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
   const myEnrollments = enrollments.filter(e => e.studentId === currentUser.id);
   const myCourses = myEnrollments.map(e => ({ enrollment: e, course: getCourseById(e.courseId)! })).filter(x => x.course);
 
@@ -62,7 +62,7 @@ export function MyCourses() {
                 <div className="p-4">
                   <Badge variant="purple" className="mb-2">{course.category}</Badge>
                   <h3 className="font-display font-bold text-[#f0f4ff] mb-1 line-clamp-2">{course.title}</h3>
-                  <p className="text-xs text-[#6b7fa8] mb-3">{instructor?.name}</p>
+                  <p className="text-xs text-[#6b7fa8] mb-3">{instructor?.name || course.instructorName}</p>
                   <div className="mb-3">
                     <div className="flex justify-between text-xs text-[#6b7fa8] mb-1">
                       <span>Progress</span><span>{enrollment.progress}%</span>
@@ -85,12 +85,20 @@ export function MyCourses() {
 // ── Course Viewer ──────────────────────────────────────────────────────────
 
 export function CourseLearn() {
-  const { currentUser, enrollments, markLessonComplete, routeParams, navigate, getCourseById } = useApp();
+  const { currentUser, enrollments, markLessonComplete, routeParams, navigate, getCourseById, dataReady, materials, loadMaterials } = useApp();
   const courseId = routeParams.courseId;
   const course = getCourseById(courseId);
 
-  const [activeLesson, setActiveLesson] = useState<Lesson | null>(course?.modules[0]?.lessons[0] || null);
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set([course?.modules[0]?.id || '']));
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const enrolled = !!currentUser && enrollments.some(e => e.studentId === currentUser.id && e.courseId === courseId);
+  useEffect(() => { if (enrolled) void loadMaterials(courseId); }, [enrolled, courseId, loadMaterials]);
+
+  const allLessons: Lesson[] = course ? course.modules.flatMap(m => m.lessons) : [];
+  const activeLesson: Lesson | null = allLessons.find(l => l.id === pickedId) || allLessons[0] || null;
+  const setActiveLesson = (l: Lesson) => setPickedId(l.id);
+
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
 
   if (!currentUser || !course) {
     return (
@@ -112,7 +120,7 @@ export function CourseLearn() {
   }
 
   const toggleModule = (id: string) => setExpandedModules(prev => {
-    const next = new Set(prev);
+    const next = new Set(prev.size === 0 && course.modules[0] ? [course.modules[0].id] : prev);
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
@@ -142,9 +150,9 @@ export function CourseLearn() {
               <button onClick={() => toggleModule(mod.id)}
                 className="w-full flex items-center justify-between p-3 bg-[#111827] border border-[rgba(255,255,255,0.07)] rounded-lg text-sm font-medium text-[#f0f4ff] hover:border-[rgba(255,255,255,0.14)] transition-all">
                 <span className="text-left truncate">{mod.title}</span>
-                <span className="text-[#4a5a7a] shrink-0 ml-2">{expandedModules.has(mod.id) ? '▼' : '▶'}</span>
+                <span className="text-[#4a5a7a] shrink-0 ml-2">{(expandedModules.has(mod.id) || (expandedModules.size === 0 && mod.id === course.modules[0]?.id)) ? '▼' : '▶'}</span>
               </button>
-              {expandedModules.has(mod.id) && (
+              {(expandedModules.has(mod.id) || (expandedModules.size === 0 && mod.id === course.modules[0]?.id)) && (
                 <div className="ml-3 mt-1 space-y-1 border-l border-[rgba(255,255,255,0.07)] pl-3">
                   {mod.lessons.map(lesson => (
                     <button key={lesson.id} onClick={() => setActiveLesson(lesson)}
@@ -183,7 +191,7 @@ export function CourseLearn() {
                 </Button>
               </div>
 
-              {activeLesson.type === 'video' ? (
+              {activeLesson.type === 'video' && /^https?:\/\//.test(activeLesson.content) ? (
                 <div className="aspect-video bg-black rounded-xl overflow-hidden mb-4">
                   <iframe
                     src={activeLesson.content}
@@ -195,19 +203,18 @@ export function CourseLearn() {
                 </div>
               ) : (
                 <div className="bg-[#0b1120] border border-[rgba(255,255,255,0.07)] rounded-xl p-6 mb-4 min-h-48">
-                  <div className="text-[#a0b4d0] leading-relaxed">{activeLesson.content || 'Lesson content will be displayed here. In a production environment, this would render rich text, PDFs, or interactive presentations.'}</div>
+                  <div className="text-[#a0b4d0] leading-relaxed"><span className="whitespace-pre-wrap">{activeLesson.content || 'No written content for this lesson yet. See the course materials below.'}</span></div>
                 </div>
               )}
 
-              {/* Resources */}
-              {activeLesson.resources.length > 0 && (
+              {(materials[courseId] || []).length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-[#6b7fa8] mb-3">Downloadable Resources</h3>
+                  <h3 className="text-sm font-semibold text-[#6b7fa8] mb-3">Course Materials</h3>
                   <div className="flex flex-wrap gap-2">
-                    {activeLesson.resources.map(r => (
-                      <a key={r.id} href={r.url}
+                    {(materials[courseId] || []).map(m => (
+                      <a key={m.id} href={`/api/materials/${m.id}/download`}
                         className="flex items-center gap-2 px-3 py-2 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.07)] border border-[rgba(255,255,255,0.07)] rounded-lg text-sm text-[#a0b4d0] transition-colors">
-                        📎 {r.name}
+                        📎 {m.fileName} <span className="text-xs text-[#4a5a7a]">{(m.sizeBytes / 1024).toFixed(0)} KB</span>
                       </a>
                     ))}
                   </div>

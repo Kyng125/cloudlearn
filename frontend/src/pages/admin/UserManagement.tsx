@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, Button, Badge, Avatar, SearchInput, Modal, Field, Input, Select, Tabs, SectionHeader, ConfirmDialog } from '../../components/UI';
-import type { User } from '../../data';
+import type { User } from '../../types';
 
 export default function UserManagement() {
-  const { users, updateUser, toggleUserActive, deleteUser, createUser } = useApp();
+  const { users, currentUser, setUserRole, toggleUserActive, deleteUser, createUser, dataReady } = useApp();
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('all');
   const [editUser, setEditUser] = useState<User | null>(null);
@@ -28,24 +28,30 @@ export default function UserManagement() {
     admin: users.filter(u => u.role === 'admin').length,
   };
 
-  const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState<'student' | 'instructor' | 'admin'>('student');
-  const [editLocation, setEditLocation] = useState('');
 
   const openEdit = (u: User) => {
-    setEditUser(u); setEditName(u.name); setEditRole(u.role); setEditLocation(u.location);
+    setEditUser(u); setEditRole(u.role);
   };
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [tempPw, setTempPw] = useState<{ email: string; password: string } | null>(null);
+
+  const handleSave = async () => {
     if (!editUser) return;
-    updateUser(editUser.id, { name: editName, role: editRole, location: editLocation });
+    if (editRole !== editUser.role) { setSaving(true); await setUserRole(editUser.id, editRole); setSaving(false); }
     setEditUser(null);
   };
 
-  const handleAdd = () => {
-    if (!newName || !newEmail) return;
-    if (!createUser(newName.trim(), newEmail.trim(), newRole)) return;
+  const handleAdd = async () => {
+    if (!newName.trim() || !newEmail.trim() || saving) return;
+    setSaving(true); setAddError('');
+    const r = await createUser(newName.trim(), newEmail.trim(), newRole);
+    setSaving(false);
+    if (!r.ok) { setAddError(r.error || 'Could not create the user'); return; } // keep the form open with the server's reason
     setAddModal(false);
+    setTempPw({ email: newEmail.trim(), password: r.temporaryPassword || '' });
     setNewName(''); setNewEmail(''); setNewRole('student');
   };
 
@@ -100,17 +106,17 @@ export default function UserManagement() {
                   <td className="px-4 py-3 text-[#6b7fa8]">{u.joinedAt}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <Button size="xs" variant="ghost" onClick={() => openEdit(u)}>Edit</Button>
-                      <Button size="xs" variant="ghost" onClick={() => toggleUserActive(u.id)}>
+                      <Button size="xs" variant="ghost" onClick={() => openEdit(u)}>Change role</Button>
+                      <Button size="xs" variant="ghost" disabled={u.id === currentUser?.id} onClick={() => toggleUserActive(u.id)}>
                         {u.isActive ? 'Deactivate' : 'Activate'}
                       </Button>
-                      <Button size="xs" variant="danger" onClick={() => setDeleteConfirm(u.id)}>Delete</Button>
+                      <Button size="xs" variant="danger" disabled={u.id === currentUser?.id} onClick={() => setDeleteConfirm(u.id)}>Delete</Button>
                     </div>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-[#4a5a7a]">No users found</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-[#4a5a7a]">{dataReady ? 'No users found' : 'Loading…'}</td></tr>
               )}
             </tbody>
           </table>
@@ -118,7 +124,7 @@ export default function UserManagement() {
       </Card>
 
       {/* Edit Modal */}
-      <Modal open={!!editUser} onClose={() => setEditUser(null)} title="Edit User">
+      <Modal open={!!editUser} onClose={() => setEditUser(null)} title="Change role">
         {editUser && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-4">
@@ -128,9 +134,6 @@ export default function UserManagement() {
                 <div className="text-xs text-[#4a5a7a]">{editUser.email}</div>
               </div>
             </div>
-            <Field label="Full Name" required>
-              <Input value={editName} onChange={e => setEditName(e.target.value)} />
-            </Field>
             <Field label="Role" required>
               <Select value={editRole} onChange={e => setEditRole(e.target.value as any)}>
                 <option value="student">Student</option>
@@ -138,19 +141,17 @@ export default function UserManagement() {
                 <option value="admin">Administrator</option>
               </Select>
             </Field>
-            <Field label="Location">
-              <Input value={editLocation} onChange={e => setEditLocation(e.target.value)} placeholder="City, Country" />
-            </Field>
+            <p className="text-xs text-[#6b7fa8]">Changing a role signs the user out of all devices. Instructors keep ownership of their courses.</p>
             <div className="flex gap-3 justify-end">
               <Button variant="secondary" onClick={() => setEditUser(null)}>Cancel</Button>
-              <Button onClick={handleSave}>Save Changes</Button>
+              <Button onClick={handleSave} disabled={saving || editRole === editUser.role}>Save Changes</Button>
             </div>
           </div>
         )}
       </Modal>
 
       {/* Add User Modal */}
-      <Modal open={addModal} onClose={() => setAddModal(false)} title="Add New User">
+      <Modal open={addModal} onClose={() => { setAddModal(false); setAddError(''); }} title="Add New User">
         <div className="space-y-4">
           <Field label="Full Name" required>
             <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Smith" />
@@ -165,11 +166,27 @@ export default function UserManagement() {
               <option value="admin">Administrator</option>
             </Select>
           </Field>
+          {addError && <div role="alert" className="text-sm text-red-300">{addError}</div>}
+          <p className="text-xs text-[#6b7fa8]">A temporary password is generated and shown once. The user must change it at first sign-in.</p>
           <div className="flex gap-3 justify-end">
-            <Button variant="secondary" onClick={() => setAddModal(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={!newName || !newEmail}>Create User</Button>
+            <Button variant="secondary" onClick={() => { setAddModal(false); setAddError(''); }}>Cancel</Button>
+            <Button onClick={handleAdd} disabled={!newName.trim() || !newEmail.trim() || saving}>{saving ? 'Creating…' : 'Create User'}</Button>
           </div>
         </div>
+      </Modal>
+
+      {/* One-time temporary password */}
+      <Modal open={!!tempPw} onClose={() => setTempPw(null)} title="User created">
+        {tempPw && (
+          <div className="space-y-4">
+            <p className="text-sm text-[#a0b4d0]">Give these sign-in details to <span className="text-[#f0f4ff]">{tempPw.email}</span>. The password is shown <strong>only once</strong> and cannot be retrieved later.</p>
+            <div className="p-3 rounded-lg bg-[#0b1120] border border-[rgba(255,255,255,0.1)] font-mono text-lg text-center text-[#f0f4ff] select-all" data-testid="temp-password">{tempPw.password}</div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(tempPw.password).catch(() => {})}>Copy</Button>
+              <Button onClick={() => setTempPw(null)}>I have saved it</Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Delete Confirm */}

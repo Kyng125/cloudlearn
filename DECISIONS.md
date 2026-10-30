@@ -34,3 +34,8 @@
 | D31 | Backup = SQLite online-backup snapshot + copy of uploads, stored under `BACKUP_DIR`; restore validates integrity and layout, takes an automatic safety backup, replaces all tables in one transaction, restores files, and revokes all sessions | DECIDED | Backups contain password hashes: protect the backup disk |
 | D32 | Activity log is written by the server for real events only (never client supplied); attempted passwords are never logged | DECIDED | |
 | D33 | Notification types limited to the front-end union (assignment, grade, message, course, quiz, system) | DECIDED | |
+| D34 | Front end holds no data of its own: `context.tsx` loads every slice from the API per role; `data.ts` and all localStorage code removed | DECIDED | Phase 5; sessions restored through `/auth/me` |
+| D35 | Assignment submissions require a file (notes optional); replace allowed until graded | CONFIRMED (D20) | |
+| D36 | Quiz taker is driven by the server deadline; answers saved by debounced PUT; expired attempts auto-submit | DECIDED | |
+| D37 | Admin Categories page is read-only (fixed list in `lib/constants.ts`); System page lists enforced controls instead of fake toggles | DECIDED | No category CRUD in scope |
+| D38 | Forgot-password shows "ask an administrator" (no email delivery in MVP) | DECIDED | |

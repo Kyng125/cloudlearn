@@ -5,6 +5,7 @@ import { Button, Input, Field } from '../components/UI';
 const DEMO_ACCOUNTS = [
   { role: '🎓 Student', email: 'student@cloudlearn.com', password: 'demo123' },
   { role: '👨‍🏫 Instructor', email: 'instructor@cloudlearn.com', password: 'demo123' },
+  { role: '👩‍🏫 Instructor 2', email: 'instructor2@cloudlearn.com', password: 'demo123' },
   { role: '⚙️ Admin', email: 'admin@cloudlearn.com', password: 'demo123' },
 ];
 
@@ -19,10 +20,9 @@ export function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    await new Promise(r => setTimeout(r, 400));
-    const ok = login(email, password);
+    const r = await login(email.trim(), password);
     setLoading(false);
-    if (!ok) setError('Invalid email or password, or the account is deactivated. Try the demo accounts below.');
+    if (!r.ok) setError(r.error || 'Sign in failed. Please try again.');
   };
 
   const quickLogin = (e: string, p: string) => {
@@ -68,7 +68,7 @@ export function Login() {
 
           {/* Demo accounts */}
           <div className="mb-6 p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
-            <p className="text-xs font-semibold text-blue-400 mb-3 uppercase tracking-wider">Demo Accounts — click to fill</p>
+            <p className="text-xs font-semibold text-blue-400 mb-3 uppercase tracking-wider">Demo accounts (password: demo123) — click to fill</p>
             <div className="space-y-2">
               {DEMO_ACCOUNTS.map(d => (
                 <button key={d.email} onClick={() => quickLogin(d.email, d.password)}
@@ -119,7 +119,6 @@ export function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'instructor'>('student');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -129,10 +128,9 @@ export function Register() {
     if (password !== confirmPassword) { setError('Passwords do not match'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 400));
-    const ok = register(name, email, password, role);
+    const r = await register(name.trim(), email.trim(), password);
     setLoading(false);
-    if (!ok) setError('An account with this email already exists');
+    if (!r.ok) setError(r.error || 'Could not create the account. Please try again.');
   };
 
   return (
@@ -148,16 +146,9 @@ export function Register() {
         <h1 className="font-display font-bold text-3xl text-[#f0f4ff] mb-2">Create account</h1>
         <p className="text-[#6b7fa8] mb-8">Create your CloudLearn account</p>
 
-        {/* Role selector */}
-        <div className="flex gap-3 mb-6">
-          {[{ id: 'student', label: '🎓 Student', desc: 'I want to learn' }, { id: 'instructor', label: '👨‍🏫 Instructor', desc: 'I want to teach' }].map(r => (
-            <button key={r.id} onClick={() => setRole(r.id as any)}
-              className={`flex-1 p-3 rounded-xl border text-left transition-all ${role === r.id ? 'border-blue-500 bg-blue-500/10' : 'border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.15)]'}`}>
-              <div className="font-medium text-[#f0f4ff] text-sm">{r.label}</div>
-              <div className="text-xs text-[#6b7fa8]">{r.desc}</div>
-            </button>
-          ))}
-        </div>
+        <p className="mb-6 p-3 rounded-xl border border-[rgba(255,255,255,0.08)] text-xs text-[#6b7fa8]">
+          Self-registration creates a <span className="text-[#f0f4ff]">student</span> account. Instructor accounts are created or promoted by an administrator.
+        </p>
 
         <form onSubmit={handleRegister} className="space-y-4">
           <Field label="Full name" required>
@@ -191,28 +182,17 @@ export function Register() {
 
 export function ForgotPassword() {
   const { navigate } = useApp();
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#0b1120] flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <button onClick={() => navigate('login')} className="text-sm text-[#6b7fa8] hover:text-white mb-8 flex items-center gap-2 transition-colors">← Back to sign in</button>
         <h1 className="font-display font-bold text-3xl text-[#f0f4ff] mb-2">Reset password</h1>
-        <p className="text-[#6b7fa8] mb-8">{"Enter your email and we'll send you a reset link"}</p>
-        {sent ? (
-          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm">
-            If an account exists for <strong>{email}</strong>, you will receive a password reset email shortly.
-            <button onClick={() => navigate('login')} className="block mt-4 text-blue-400 hover:text-blue-300 transition-colors">Back to sign in →</button>
-          </div>
-        ) : (
-          <form onSubmit={e => { e.preventDefault(); setSent(true); }} className="space-y-4">
-            <Field label="Email address" required>
-              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
-            </Field>
-            <Button type="submit" className="w-full justify-center">Send reset link</Button>
-          </form>
-        )}
+        <p className="text-[#6b7fa8] mb-8">Password resets are handled by your administrator</p>
+        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[#a0b4d0] text-sm">
+          There is no automated reset email. Ask a CloudLearn administrator to reset your account; you will be given a temporary password and asked to choose a new one when you sign in.
+          <button onClick={() => navigate('login')} className="block mt-4 text-blue-400 hover:text-blue-300 transition-colors">Back to sign in →</button>
+        </div>
       </div>
     </div>
   );

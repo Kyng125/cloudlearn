@@ -6,9 +6,7 @@ import { Card, Button, Badge, Avatar, Modal, Field, Input, Textarea, SearchInput
 // ── Discussions ──────────────────────────────────────────────────────────
 
 export function Discussions() {
-  const { currentUser, discussions, enrollments, courses, postDiscussion, replyToDiscussion, getCourseById, getUserById } = useApp();
-  if (!currentUser) return null;
-
+  const { currentUser, discussions, enrollments, courses, postDiscussion, replyToDiscussion, getCourseById, getUserById, dataReady } = useApp();
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [newThreadModal, setNewThreadModal] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -16,6 +14,8 @@ export function Discussions() {
   const [newBody, setNewBody] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('');
   const [search, setSearch] = useState('');
+  if (!currentUser) return null;
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
 
   // Students see forums of courses they are enrolled in; instructors see those of courses they teach.
   const myEnrollments = enrollments.filter(e => e.studentId === currentUser.id);
@@ -25,25 +25,22 @@ export function Discussions() {
   const myDiscussions = discussions.filter(d => courseIds.includes(d.courseId));
   const filtered = myDiscussions.filter(d =>
     !search || d.title.toLowerCase().includes(search.toLowerCase()) || d.body.toLowerCase().includes(search.toLowerCase())
-  ).sort((a, b) => {
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const activeThread = discussions.find(d => d.id === selectedThread);
 
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!newTitle.trim() || !newBody.trim() || !selectedCourse) return;
-    postDiscussion(selectedCourse, newTitle, newBody);
+    await postDiscussion(selectedCourse, newTitle, newBody);
     setNewThreadModal(false);
     setNewTitle(''); setNewBody(''); setSelectedCourse('');
   };
 
-  const handleReply = () => {
+  const handleReply = async () => {
     if (!replyText.trim() || !selectedThread) return;
-    replyToDiscussion(selectedThread, replyText);
+    const text = replyText;
     setReplyText('');
+    await replyToDiscussion(selectedThread, text);
   };
 
   if (selectedThread && activeThread) {
@@ -59,7 +56,6 @@ export function Discussions() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="font-display font-bold text-xl text-[#f0f4ff]">{activeThread.title}</h2>
-                {activeThread.isPinned && <Badge variant="yellow">📌 Pinned</Badge>}
               </div>
               <p className="text-xs text-[#4a5a7a]">{getUserById(activeThread.authorId)?.name} · {new Date(activeThread.createdAt).toLocaleDateString()} · {course?.title}</p>
             </div>
@@ -123,7 +119,6 @@ export function Discussions() {
                   <Avatar src={author?.avatar} name={author?.name || ''} size={36} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      {thread.isPinned && <span className="text-yellow-400 text-xs">📌</span>}
                       <h3 className="font-medium text-[#f0f4ff] truncate">{thread.title}</h3>
                     </div>
                     <p className="text-xs text-[#6b7fa8] mb-2 line-clamp-1">{thread.body}</p>
@@ -173,31 +168,30 @@ export function Discussions() {
 // ── Messages ──────────────────────────────────────────────────────────────
 
 export function Messages() {
-  const { currentUser, messages, sendMessage, markMessageRead, users, getUserById } = useApp();
-  if (!currentUser) return null;
-
+  const { currentUser, messages, sendMessage, markMessageRead, contacts, getUserById, dataReady } = useApp();
   const [activeMsg, setActiveMsg] = useState<string | null>(null);
   const [composeModal, setComposeModal] = useState(false);
   const [toId, setToId] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [tab, setTab] = useState<'inbox' | 'sent'>('inbox');
+  if (!currentUser) return null;
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
 
   const inbox = messages.filter(m => m.toId === currentUser.id).sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
   const sent = messages.filter(m => m.fromId === currentUser.id).sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
   const displayed = tab === 'inbox' ? inbox : sent;
 
   const activeMessage = messages.find(m => m.id === activeMsg);
-  if (activeMsg && activeMessage && !activeMessage.isRead) markMessageRead(activeMsg);
+  if (activeMsg && activeMessage && !activeMessage.isRead && activeMessage.toId === currentUser.id) markMessageRead(activeMsg);
 
-  const handleCompose = () => {
+  const handleCompose = async () => {
     if (!toId || !subject.trim() || !body.trim()) return;
-    sendMessage(toId, subject, body);
-    setComposeModal(false);
-    setToId(''); setSubject(''); setBody('');
+    if (await sendMessage(toId, subject, body)) {
+      setComposeModal(false);
+      setToId(''); setSubject(''); setBody('');
+    }
   };
-
-  const contacts = users.filter(u => u.id !== currentUser.id);
 
   return (
     <DashboardLayout>
@@ -271,7 +265,7 @@ export function Messages() {
             <select value={toId} onChange={e => setToId(e.target.value)}
               className="w-full px-3 py-2 bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-lg text-sm text-[#f0f4ff]">
               <option value="">Select recipient...</option>
-              {contacts.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+              {contacts.filter(u => u.id !== currentUser.id).map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
             </select>
           </Field>
           <Field label="Subject" required>
@@ -293,8 +287,9 @@ export function Messages() {
 // ── Notifications ──────────────────────────────────────────────────────────
 
 export function NotificationsPage() {
-  const { currentUser, notifications, markNotificationRead, markAllNotificationsRead } = useApp();
+  const { currentUser, notifications, markNotificationRead, markAllNotificationsRead, dataReady } = useApp();
   if (!currentUser) return null;
+  if (!dataReady) return <DashboardLayout><p className="text-[#6b7fa8]">Loading…</p></DashboardLayout>;
 
   const myNotifs = notifications.filter(n => n.userId === currentUser.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const unread = myNotifs.filter(n => !n.isRead).length;

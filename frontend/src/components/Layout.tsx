@@ -75,7 +75,7 @@ function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: { collapsed: b
   if (!currentUser) return null;
 
   const navItems = currentUser.role === 'student' ? studentNav : currentUser.role === 'instructor' ? instructorNav : adminNav;
-  const unreadNotifs = notifications.filter(n => n.userId === currentUser.id && !n.isRead).length;
+  const unreadNotifs = notifications.filter(n => !n.isRead).length;
 
   return (
     <aside className={`fixed left-0 top-0 h-full z-40 flex flex-col bg-[#0d1628] border-r border-[rgba(255,255,255,0.07)] transition-all duration-300 w-60 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 ${collapsed ? 'md:w-16' : 'md:w-60'}`}>
@@ -139,7 +139,7 @@ function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: { collapsed: b
               <div className="text-sm font-medium text-[#f0f4ff] truncate">{currentUser.name}</div>
               <div className="text-xs text-[#4a5a7a] truncate">{currentUser.email}</div>
             </div>
-            <button onClick={logout} className="text-[#4a5a7a] hover:text-red-400 transition-colors" title="Logout">
+            <button onClick={() => { void logout(); }} className="text-[#4a5a7a] hover:text-red-400 transition-colors" title="Logout">
               {Icons.logout}
             </button>
           </>
@@ -155,7 +155,7 @@ function Header({ sidebarCollapsed, onMenuClick }: { sidebarCollapsed: boolean; 
   const { currentUser, route, navigate, notifications } = useApp();
   if (!currentUser) return null;
 
-  const unread = notifications.filter(n => n.userId === currentUser.id && !n.isRead).length;
+  const unread = notifications.filter(n => !n.isRead).length;
 
   const routeLabels: Partial<Record<Route, string>> = {
     'student-dashboard': 'Dashboard', 'student-my-courses': 'My Courses', 'student-learn': 'Course Viewer',
@@ -188,7 +188,7 @@ function Header({ sidebarCollapsed, onMenuClick }: { sidebarCollapsed: boolean; 
           className="relative text-[#6b7fa8] hover:text-white transition-colors p-2"
         >
           {Icons.notifications}
-          {unread > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}
+          {unread > 0 && <span className="absolute top-0.5 right-0 bg-red-500 text-white text-[10px] leading-none rounded-full px-1 py-0.5 min-w-[16px] text-center">{unread > 99 ? '99+' : unread}</span>}
         </button>
         <button
           onClick={() => navigate(currentUser.role === 'student' ? 'student-profile' : currentUser.role === 'instructor' ? 'instructor-profile' : 'admin-settings')}
@@ -204,6 +204,8 @@ function Header({ sidebarCollapsed, onMenuClick }: { sidebarCollapsed: boolean; 
 // ── Dashboard Layout ──────────────────────────────────────────────────────
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
+  const { currentUser, dataReady, navigate, route } = useApp();
+  const profileRoute = `${currentUser?.role || 'student'}-${currentUser?.role === 'admin' ? 'settings' : 'profile'}` as Route;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -219,7 +221,13 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
       <main className={`pt-16 min-h-screen transition-all duration-300 pl-0 ${collapsed ? 'md:pl-16' : 'md:pl-60'}`}>
         <div className="p-4 md:p-6 max-w-7xl mx-auto min-w-0">
-          {children}
+          {currentUser?.mustChangePassword && (
+            <div role="alert" className="mb-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm text-amber-300 flex flex-wrap items-center gap-3">
+              <span>You are using a temporary password. Please set a new one.</span>
+              {route !== profileRoute && <button onClick={() => navigate(profileRoute)} className="underline hover:text-amber-200">Change password</button>}
+            </div>
+          )}
+          {!dataReady ? <div className="py-16 text-center text-[#6b7fa8]" role="status">Loading your data…</div> : children}
         </div>
       </main>
     </div>

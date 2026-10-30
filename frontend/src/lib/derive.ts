@@ -1,4 +1,4 @@
-import type { Enrollment, Submission, Assignment } from '../data';
+import type { Enrollment, Submission, Assignment } from '../types';
 
 // Derived, state-backed figures. Replaces the hard-coded demo charts and the
 // "grade is already a percentage" assumption in the original generated UI.

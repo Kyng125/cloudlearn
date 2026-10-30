@@ -37,7 +37,8 @@ function RoleRedirect() {
 }
 
 function Router() {
-  const { route, currentUser } = useApp();
+  const { route, currentUser, sessionChecked } = useApp();
+  if (!sessionChecked) return <div className="min-h-screen bg-[#0b1120] flex items-center justify-center text-[#6b7fa8]" role="status">Loading CloudLearn…</div>;
 
   // Public routes
   if (route === 'landing') return <Landing />;

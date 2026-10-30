@@ -30,6 +30,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      // During development the API runs separately (npm start in ../backend).
+      proxy: { '/api': 'http://127.0.0.1:3000' },
       host: '0.0.0.0',
       port: parseInt(process.env.PORT || '8443'),
       strictPort: true,
