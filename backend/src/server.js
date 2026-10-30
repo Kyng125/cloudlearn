@@ -15,4 +15,7 @@ const app = createApp(db, {
 });
 const port = parseInt(process.env.PORT, 10) || 3000;
 const server = app.listen(port, () => console.log(`CloudLearn listening on :${port} (db: ${dbFile})`));
+// Keep idle connections open longer than typical proxy timeouts (Render's is 60 s) so a client never reuses a socket the server just closed (ECONNRESET seen under load).
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => { db.close(); process.exit(0); }));

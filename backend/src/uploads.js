@@ -17,7 +17,7 @@ function makeUploads(config) {
   fs.mkdirSync(config.uploadDir, { recursive: true });
   const upload = multer({
     storage: multer.diskStorage({
-      destination: config.uploadDir,
+      destination: (_req, _file, cb) => { fs.mkdirSync(config.uploadDir, { recursive: true }); cb(null, config.uploadDir); }, // survives the folder being removed while running
       filename: (_req, _file, cb) => cb(null, crypto.randomUUID()), // never derived from user input
     }),
     limits: { fileSize: config.maxUploadBytes, files: 1, fields: 10 },
@@ -32,7 +32,16 @@ function makeUploads(config) {
     return p.startsWith(path.resolve(config.uploadDir) + path.sep) ? p : null; // no path escape
   };
   const remove = (stored) => { const p = pathFor(stored); if (p) fs.rm(p, { force: true }, () => {}); };
-  return { upload, pathFor, remove, cleanName };
+  // Same as upload.single(), but a 0-byte file is refused and removed from disk.
+  const single = (field) => (req, res, next) => upload.single(field)(req, res, (err) => {
+    if (err) return next(err);
+    if (req.file && req.file.size === 0) {
+      fs.rmSync(req.file.path, { force: true });
+      return next(Object.assign(new Error('The file is empty'), { status: 400 }));
+    }
+    next();
+  });
+  return { upload, single, pathFor, remove, cleanName };
 }
 
 module.exports = { makeUploads };

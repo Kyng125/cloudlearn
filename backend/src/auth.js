@@ -25,6 +25,9 @@ function publicUser(u) {
 function makeAuth(db, config) {
   // Cost factor is configurable so tests stay fast; production uses 10+.
   const hash = (pw) => bcrypt.hashSync(pw, config.bcryptRounds);
+  // Async variants yield to the event loop between rounds, so a burst of sign-ins cannot freeze every other request.
+  const hashAsync = (pw) => bcrypt.hash(pw, config.bcryptRounds);
+  const verifyAsync = (pw, h) => bcrypt.compare(pw, h);
   const DUMMY = hash('not-a-real-password'); // equalises timing for unknown emails
 
   function createSession(userId) {
@@ -80,7 +83,7 @@ function makeAuth(db, config) {
   }
 
   return {
-    hash, DUMMY, verify: (pw, h) => bcrypt.compareSync(pw, h),
+    hash, hashAsync, verifyAsync, DUMMY, verify: (pw, h) => bcrypt.compareSync(pw, h),
     createSession, setSession, clearSession, destroySessionsFor,
     attachUser, requireAuth, requireRole,
     throttleState, recordFailure, clearFailures, logActivity, newId,

@@ -264,3 +264,13 @@ test('seed: relative dates, foreign keys intact, demo data present', async () =>
   assert.ok(s.db.prepare('SELECT COUNT(*) c FROM courses WHERE is_published=1').get().c >= 4);
   await s.close();
 });
+
+test('Phase 6: simultaneous sign-ups with the same email create one account and no server error', async () => {
+  const s = await start();
+  try {
+    const rs = await Promise.all(Array.from({ length: 6 }, () => new Client(s.base).post('/api/auth/register', { name: 'Race', email: 'race@example.com', password: 'secret12' })));
+    assert.equal(rs.filter((r) => r.status === 201).length, 1);
+    assert.ok(rs.every((r) => r.status === 201 || r.status === 409), rs.map((r) => r.status).join());
+    assert.equal(s.db.prepare("SELECT COUNT(*) c FROM users WHERE email='race@example.com'").get().c, 1);
+  } finally { await s.close(); }
+});

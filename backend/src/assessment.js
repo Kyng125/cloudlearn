@@ -77,7 +77,7 @@ function assessmentRoutes({ db, auth, access, uploads, config }) {
     if (prev) return res.status(409).json({ error: 'This submission has already been graded and can no longer be replaced' });
     req.assignment = a; req.course = c; next();
   };
-  r.post('/assignments/:id/submit', preSubmit, uploads.upload.single('file'), (req, res) => {
+  r.post('/assignments/:id/submit', preSubmit, uploads.single('file'), (req, res) => {
     const a = req.assignment, content = str(req.body && req.body.content, 5000);
     if (!req.file) return res.status(400).json({ error: 'A file is required (form field "file")' });
     const late = Date.now() > new Date(a.due_at).getTime() ? 1 : 0;

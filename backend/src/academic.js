@@ -135,7 +135,7 @@ function academicRoutes({ db, auth, access, uploads }) {
   // ---------- Materials (TC04) ----------
   const materialOut = (m) => ({ id: m.id, courseId: m.course_id, fileName: m.file_name, mimeType: m.mime_type, sizeBytes: m.size_bytes, createdAt: m.created_at, uploadedBy: m.uploaded_by });
 
-  priv.post('/courses/:id/materials', loadCourse('manage'), uploads.upload.single('file'), (req, res) => {
+  priv.post('/courses/:id/materials', loadCourse('manage'), uploads.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'A file is required (form field "file")' });
     const id = newId('mat');
     try {

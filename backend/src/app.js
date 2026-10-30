@@ -60,24 +60,28 @@ function createApp(db, overrides = {}) {
 
   api.get('/health', (_req, res) => { db.prepare('SELECT 1').get(); res.json({ ok: true }); });
 
+  const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
   // ---------- Auth ----------
-  api.post('/auth/register', (req, res) => {
+  api.post('/auth/register', wrap(async (req, res) => {
     const name = str(req.body.name, 100), email = str(req.body.email, 254).toLowerCase(), password = req.body.password;
     if (!name) return res.status(400).json({ error: 'Name is required' });
     if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'A valid email is required' });
     if (!validPw(password)) return res.status(400).json({ error: 'Password must be 6 to 72 characters' });
+    const pwHash = await auth.hashAsync(password);
+    // Check and insert together with no await between them, so two simultaneous sign-ups cannot both pass the check.
     if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) return res.status(409).json({ error: 'An account with this email already exists' });
     const id = newId('u');
     // Self-registration always creates a student; any role in the body is ignored.
     db.prepare('INSERT INTO users (id, name, email, password_hash, role, created_at) VALUES (?,?,?,?,?,?)')
-      .run(id, name, email, auth.hash(password), 'student', now());
+      .run(id, name, email, pwHash, 'student', now());
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     auth.setSession(res, auth.createSession(id));
     auth.logActivity({ userId: id, email, action: 'Registered', ip: ip(req) });
     res.status(201).json({ user: publicUser(user), home: homeFor(user) });
-  });
+  }));
 
-  api.post('/auth/login', (req, res) => {
+  api.post('/auth/login', wrap(async (req, res) => {
     const email = str(req.body.email, 254).toLowerCase(), password = req.body.password;
     if (!email || typeof password !== 'string' || !password) return res.status(400).json({ error: 'Email and password are required' });
     const addr = ip(req);
@@ -87,7 +91,7 @@ function createApp(db, overrides = {}) {
       return res.status(429).json({ error: 'Too many failed sign-in attempts. Try again later.', retryAfterSeconds: t.retryAfterSec });
     }
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    const ok = auth.verify(password, user ? user.password_hash : auth.DUMMY) && !!user;
+    const ok = (await auth.verifyAsync(password, user ? user.password_hash : auth.DUMMY)) && !!user;
     if (!ok) {
       auth.recordFailure(email, addr);
       auth.logActivity({ userId: user ? user.id : null, email, action: 'Failed login attempt', ip: addr, status: 'failed' });
@@ -101,7 +105,7 @@ function createApp(db, overrides = {}) {
     auth.setSession(res, auth.createSession(user.id));
     auth.logActivity({ userId: user.id, email, action: 'Logged in', ip: addr });
     res.json({ user: publicUser(user), home: homeFor(user) });
-  });
+  }));
 
   api.post('/auth/logout', (req, res) => {
     const token = parseCookies(req.headers.cookie)[COOKIE];
@@ -126,16 +130,16 @@ function createApp(db, overrides = {}) {
     res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)) });
   });
 
-  api.post('/auth/change-password', auth.requireAuth, (req, res) => {
+  api.post('/auth/change-password', auth.requireAuth, wrap(async (req, res) => {
     const { currentPassword, newPassword } = req.body;
-    if (typeof currentPassword !== 'string' || !auth.verify(currentPassword, req.user.password_hash)) return res.status(400).json({ error: 'Current password is incorrect' });
+    if (typeof currentPassword !== 'string' || !(await auth.verifyAsync(currentPassword, req.user.password_hash))) return res.status(400).json({ error: 'Current password is incorrect' });
     if (!validPw(newPassword)) return res.status(400).json({ error: 'New password must be 6 to 72 characters' });
-    db.prepare('UPDATE users SET password_hash=?, must_change_password=0 WHERE id=?').run(auth.hash(newPassword), req.user.id);
+    db.prepare('UPDATE users SET password_hash=?, must_change_password=0 WHERE id=?').run(await auth.hashAsync(newPassword), req.user.id);
     // Sign out every other session; keep the current one.
     db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(req.user.id, req.sessionHash);
     auth.logActivity({ userId: req.user.id, email: req.user.email, action: 'Changed password', ip: ip(req) });
     res.json({ ok: true });
-  });
+  }));
 
   // ---------- Admin: users ----------
   const admin = express.Router();

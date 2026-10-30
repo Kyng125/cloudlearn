@@ -39,3 +39,8 @@
 | D36 | Quiz taker is driven by the server deadline; answers saved by debounced PUT; expired attempts auto-submit | DECIDED | |
 | D37 | Admin Categories page is read-only (fixed list in `lib/constants.ts`); System page lists enforced controls instead of fake toggles | DECIDED | No category CRUD in scope |
 | D38 | Forgot-password shows "ask an administrator" (no email delivery in MVP) | DECIDED | |
+| D39 | Zero-byte uploads are refused (400) and removed from disk | DECIDED | Phase 6 error tests found they were accepted |
+| D40 | Upload destination folder is re-created on demand | DECIDED | Phase 6: uploads returned 500 if the folder vanished while running |
+| D41 | Register, login and change-password use asynchronous bcrypt; registration checks the email and inserts with no await between, so simultaneous duplicates give one 201 and 409s | DECIDED | Phase 6 load test: synchronous hashing froze every other request |
+| D42 | Server keep-alive 65 s (headers 66 s) | DECIDED | Phase 6 load test: ECONNRESET on reused sockets after ~5 s stalls |
+| D43 | bcrypt cost stays at 10 (pure-JS bcryptjs). 100 students signing in within the same second wait up to ~8 s; 25 wait under 1 s | OPEN (owner) | Options: lower cost to 8 (about 4x faster), native bcrypt (build tools on Windows), or accept and stagger |

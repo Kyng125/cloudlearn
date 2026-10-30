@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { start, Client, asUser, USERS, files } = require('./helpers');
+const { start, Client, asUser, USERS, files, as } = require('./helpers');
 
 const U = (s, k) => asUser(s.base, USERS[k]);
 async function newPublishedCourse(ins, title = 'Test Course') {
@@ -313,4 +313,30 @@ test('Phase 3: every new endpoint refuses anonymous callers', async () => {
   for (const [m, p] of probes) assert.equal((await c.req(m, p, m === 'GET' ? undefined : {})).status, 401, `${m} ${p}`);
   assert.equal((await c.get('/api/public/courses')).status, 200);                                                  // the catalogue is the only public data
   await s.close();
+});
+
+test('Phase 6: an empty (0-byte) upload is refused and leaves no file or row behind', async () => {
+  const s = await start();
+  try {
+    const stu = await as(s.base, 'student');
+    const before = files(s.uploadDir).length;
+    const r = await stu.upload('/api/assignments/a2/submit', { content: '' }, 'empty.txt', '');
+    assert.equal(r.status, 400);
+    assert.match(r.json.error, /empty/i);
+    assert.equal(files(s.uploadDir).length, before, 'no stray file');
+    const ins = await as(s.base, 'instructor');
+    const m = await ins.upload('/api/courses/c1/materials', {}, 'empty.txt', '');
+    assert.equal(m.status, 400);
+  } finally { await s.close(); }
+});
+
+test('Phase 6: uploads keep working if the uploads folder disappears while the server runs', async () => {
+  const s = await start();
+  try {
+    fs.rmSync(s.uploadDir, { recursive: true, force: true });
+    const stu = await as(s.base, 'student');
+    const r = await stu.upload('/api/assignments/a2/submit', { content: '' }, 'again.txt', 'data');
+    assert.ok([200, 201].includes(r.status), 'got ' + r.status);
+    assert.equal(files(s.uploadDir).length, 1);
+  } finally { await s.close(); }
 });

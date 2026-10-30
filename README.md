@@ -17,7 +17,7 @@ npm run dev
 Demo logins (password `demo123`): student@ / instructor@ / admin@cloudlearn.com
 
 ## Status
-Phases 1 to 5 complete (front end repaired and connected to the API, backend auth/roles, academic API, communication/reports/backup). Phases 6 and 7 (evaluation tooling, deployment) remain.
+Phases 1 to 6 complete (front end repaired and connected to the API, backend auth/roles, academic API, communication/reports/backup). Phase 7 (deployment) remains.
 
 ## Backend
 ```
@@ -37,3 +37,9 @@ cd frontend && npm run build   # backend serves frontend/dist
 NODE_PATH=$(npm root -g) node tests/e2e/crawl.js   # every screen, 3 roles, desktop + mobile
 NODE_PATH=$(npm root -g) node tests/e2e/flow.js    # TC01-13 flows, desktop + mobile
 ```
+
+## Full evaluation (Chapter 4)
+```
+NODE_PATH=$(npm root -g) node tests/run-evaluation.js [--skip-load]   # writes docs/EVALUATION-RESULTS.md
+```
+Individual suites: `cd backend && npm test` (includes access-control matrix), `tests/e2e/{crawl,flow,errors,recovery}.js`, `tests/load/load.js` (`SCENARIO=login` for the sign-in burst).
