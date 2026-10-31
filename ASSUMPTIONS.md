@@ -15,6 +15,6 @@
 - A14 Messaging rules in D28 are an assumption; the report does not define who may message whom.
 - A15 Instructors may see reports only for their own courses.
 - A16 Backups are manual and kept until an admin deletes them; no schedule or automatic pruning (operations note for Phase 7).
-A17 | Render's free tier behaves as documented at render.com/docs/free (ephemeral disk, 15-minute spin-down, 750 hours). Not tested on a live Render service. | ASSUMED (sourced from docs)
-A18 | One Render proxy hop in front of the app (trust proxy = 1) | ASSUMED
-A19 | better-sqlite3 installs from a prebuilt binary on Render (Linux, Node 22) and on Windows | ASSUMED (installed fine on Linux/Node 22 here; Windows not tested)
+- A17 Render's free tier behaves as documented at render.com/docs/free (ephemeral disk, 15-minute spin-down, 750 hours). Not tested on a live Render service. (ASSUMED (sourced from docs))
+- A18 One Render proxy hop in front of the app (trust proxy = 1) (ASSUMED)
+- A19 better-sqlite3 installs from a prebuilt binary on Render (Linux, Node 22) and on Windows (ASSUMED (installed fine on Linux/Node 22 here; Windows not tested))
