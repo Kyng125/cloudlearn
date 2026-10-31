@@ -5,7 +5,7 @@ Everything below was written for Windows (PowerShell). Nothing here has been exe
 ## Install
 - [ ] Node.js 22 LTS from nodejs.org (includes npm). Check: `node -v` shows v22.x
 - [ ] Git for Windows (optional)
-- [ ] No Visual Studio build tools are needed: `better-sqlite3` ships a prebuilt Windows binary and `bcryptjs` is pure JavaScript. If `npm ci` tries to compile and fails, install "Desktop development with C++" from Visual Studio Build Tools, or switch to Node 22.
+- [ ] No Visual Studio build tools are needed: `better-sqlite3` ships a prebuilt Windows binary inside its package and `backend/.npmrc` sets `ignore-scripts=true` so npm does not try to compile it; `bcryptjs` is pure JavaScript. If the app still reports a missing native module, use Node 22 (x64).
 
 ## Run (development)
 ```powershell
