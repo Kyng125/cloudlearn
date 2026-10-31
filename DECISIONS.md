@@ -43,4 +43,4 @@
 | D40 | Upload destination folder is re-created on demand | DECIDED | Phase 6: uploads returned 500 if the folder vanished while running |
 | D41 | Register, login and change-password use asynchronous bcrypt; registration checks the email and inserts with no await between, so simultaneous duplicates give one 201 and 409s | DECIDED | Phase 6 load test: synchronous hashing froze every other request |
 | D42 | Server keep-alive 65 s (headers 66 s) | DECIDED | Phase 6 load test: ECONNRESET on reused sockets after ~5 s stalls |
-| D43 | bcrypt cost stays at 10 (pure-JS bcryptjs). 100 students signing in within the same second wait up to ~8 s; 25 wait under 1 s | OPEN (owner) | Options: lower cost to 8 (about 4x faster), native bcrypt (build tools on Windows), or accept and stagger |
+| D43 | bcrypt cost stays at 10 (pure-JS bcryptjs). 100 students signing in within the same second wait up to ~8 s; 25 wait under 1 s | CONFIRMED (owner: keep as is) | Lecturers should stagger the start of class quizzes; revisit if more than about 50 students sign in at once |
