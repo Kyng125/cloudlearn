@@ -12,7 +12,7 @@ const roles = { student: 'student@cloudlearn.com', instructor: 'instructor@cloud
       p.on('response', r => { if (r.url().includes('/api/') && r.status() >= 400 && r.status() !== 401) problems.push(`${tag} ${r.status()} ${r.request().method()} ${r.url().replace(BASE, '')}`); });
       await p.goto(BASE,{waitUntil:'domcontentloaded'}); await p.waitForTimeout(800);
       await p.getByRole('button', { name: 'Sign in', exact: true }).first().click();
-      await p.locator('input[type=email]').fill(email); await p.locator('input[type=password]').fill('demo123');
+      await p.locator('input[type=email]').fill(email); await p.locator('input[type=password]').fill(/^admin@/.test(email) ? (process.env.ADMIN_PW || 'demo123') : 'demo123');
       await p.locator('input[type=password]').press('Enter');
       await p.waitForTimeout(1500);
       

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useApp, type Route } from '../context';
 import { Avatar } from './UI';
 
@@ -208,6 +208,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const profileRoute = `${currentUser?.role || 'student'}-${currentUser?.role === 'admin' ? 'settings' : 'profile'}` as Route;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [ephemeral, setEphemeral] = useState(false);
+  useEffect(() => { fetch('/api/health').then(r => r.json()).then(j => setEphemeral(!!j.ephemeral)).catch(() => {}); }, []);
 
   return (
     <div className="min-h-screen bg-[#0b1120]">
@@ -221,6 +223,11 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
       <main className={`pt-16 min-h-screen transition-all duration-300 pl-0 ${collapsed ? 'md:pl-16' : 'md:pl-60'}`}>
         <div className="p-4 md:p-6 max-w-7xl mx-auto min-w-0">
+          {ephemeral && (
+            <div role="note" className="mb-4 p-3 rounded-lg border border-sky-500/30 bg-sky-500/10 text-sm text-sky-200">
+              Demo hosting: this site runs on a free plan that resets its data when it restarts or sleeps after about 15 idle minutes. Do not rely on it to keep real coursework.
+            </div>
+          )}
           {currentUser?.mustChangePassword && (
             <div role="alert" className="mb-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-sm text-amber-300 flex flex-wrap items-center gap-3">
               <span>You are using a temporary password. Please set a new one.</span>

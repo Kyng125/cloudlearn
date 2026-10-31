@@ -8,14 +8,15 @@ const TABLES = ['activity_log', 'notifications', 'messages', 'posts', 'threads',
   'submissions', 'assignments', 'lesson_progress', 'enrollments', 'materials', 'lessons', 'modules', 'courses',
   'login_attempts', 'sessions', 'users'];
 
-function seed(db, { rounds = 10, password = 'demo123' } = {}) {
+function seed(db, { rounds = 10, password = 'demo123', adminEmail = 'admin@cloudlearn.com', adminPassword = null } = {}) {
   const t = Date.now();
   const at = (days) => new Date(t + days * DAY).toISOString();
   const hash = bcrypt.hashSync(password, rounds);
+  const adminHash = adminPassword ? bcrypt.hashSync(adminPassword, rounds) : hash; // a public deployment must never share the demo password with the admin
   const run = db.transaction(() => {
     const user = db.prepare('INSERT INTO users (id,name,email,password_hash,role,bio,location,created_at) VALUES (?,?,?,?,?,?,?,?)');
     [
-      ['u_admin', 'Platform Admin', 'admin@cloudlearn.com', 'admin', 'Platform administrator.', 'Lagos, Nigeria', -120],
+      ['u_admin', 'Platform Admin', adminEmail, 'admin', 'Platform administrator.', 'Lagos, Nigeria', -120],
       ['u_ins1', 'Dr. Sarah Chen', 'instructor@cloudlearn.com', 'instructor', 'Lecturer in programming and databases.', 'Lagos, Nigeria', -110],
       ['u_ins2', 'Mrs. Folake Adeyemi', 'instructor2@cloudlearn.com', 'instructor', 'Lecturer in web technologies and networks.', 'Lagos, Nigeria', -100],
       ['u_stu1', 'Alex Johnson', 'student@cloudlearn.com', 'student', 'HND Computer Science student.', 'Lagos, Nigeria', -60],
@@ -23,7 +24,7 @@ function seed(db, { rounds = 10, password = 'demo123' } = {}) {
       ['u_stu3', 'Amina Bello', 'amina@example.com', 'student', '', 'Lagos, Nigeria', -50],
       ['u_stu4', 'Emeka Nwosu', 'emeka@example.com', 'student', '', 'Lagos, Nigeria', -45],
       ['u_stu5', 'Ngozi Eze', 'ngozi@example.com', 'student', '', 'Lagos, Nigeria', -40],
-    ].forEach(([id, name, email, role, bio, loc, d]) => user.run(id, name, email, hash, role, bio, loc, at(d)));
+    ].forEach(([id, name, email, role, bio, loc, d]) => user.run(id, name, email, role === 'admin' ? adminHash : hash, role, bio, loc, at(d)));
 
     const course = db.prepare('INSERT INTO courses (id,title,description,instructor_id,category,level,is_published,created_at) VALUES (?,?,?,?,?,?,?,?)');
     const module_ = db.prepare('INSERT INTO modules (id,course_id,title,position) VALUES (?,?,?,?)');

@@ -1,17 +1,21 @@
 const path = require('path');
 const { openDb } = require('./db');
 const { createApp } = require('./app');
+const { bootstrap } = require('./bootstrap');
 
 const prod = process.env.NODE_ENV === 'production';
 const dbFile = process.env.DB_FILE || path.join(__dirname, '..', 'data', 'cloudlearn.db');
 const db = openDb(dbFile);
+const rounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 10;
+try { console.log('Bootstrap:', bootstrap(db, process.env, { rounds })); } catch (e) { console.error('Cannot start:', e.message); process.exit(1); }
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 const app = createApp(db, {
   uploadDir,
   backupDir: process.env.BACKUP_DIR || path.join(__dirname, '..', 'backups'),
   cookieSecure: prod,
   trustProxy: prod,
-  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 10,
+  bcryptRounds: rounds,
+  ephemeral: process.env.EPHEMERAL_STORAGE === '1',
 });
 const port = parseInt(process.env.PORT, 10) || 3000;
 const server = app.listen(port, () => console.log(`CloudLearn listening on :${port} (db: ${dbFile})`));

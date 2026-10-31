@@ -15,7 +15,7 @@ const DEFAULTS = {
   bcryptRounds: 10, sessionDays: 7, cookieSecure: false,
   throttleMax: 5, throttleIpMax: 20, throttleWindowMin: 15,
   uploadDir: path.join(__dirname, '..', 'uploads'), backupDir: path.join(__dirname, '..', 'backups'), maxUploadBytes: 10 * 1024 * 1024, quizGraceSec: 5,
-  trustProxy: false, staticDir: path.join(__dirname, '..', '..', 'frontend', 'dist'),
+  ephemeral: false, trustProxy: false, staticDir: path.join(__dirname, '..', '..', 'frontend', 'dist'),
 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLES = ['student', 'instructor', 'admin'];
@@ -33,6 +33,10 @@ function createApp(db, overrides = {}) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'same-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    // The app only loads its own scripts; styles/fonts come from Google Fonts, images may be any https URL (course thumbnails).
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+    if (config.cookieSecure) res.setHeader('Strict-Transport-Security', 'max-age=15552000'); // 180 days; only meaningful over HTTPS
     next();
   });
   // CSRF defence in depth on top of SameSite=Lax: state-changing requests must be same-origin.
@@ -58,7 +62,8 @@ function createApp(db, overrides = {}) {
   const homeFor = (u) => `${u.role}-dashboard`;
   const validPw = (pw) => typeof pw === 'string' && pw.length >= 6 && pw.length <= 72;
 
-  api.get('/health', (_req, res) => { db.prepare('SELECT 1').get(); res.json({ ok: true }); });
+  const startedAt = new Date().toISOString();
+  api.get('/health', (_req, res) => { db.prepare('SELECT 1').get(); res.json({ ok: true, ephemeral: !!config.ephemeral, startedAt }); });
 
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
