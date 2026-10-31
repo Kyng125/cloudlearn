@@ -5,7 +5,7 @@ const { spawn, spawnSync } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const ROOT = path.resolve(__dirname, '..'), BACK = path.join(ROOT, 'backend'), E2E = path.join(__dirname, 'e2e');
 const PORT = 3100, BASE = `http://localhost:${PORT}`;
-const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', timeout: 600000, maxBuffer: 50 * 1024 * 1024, ...opts });
+const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { shell: process.platform === 'win32' && cmd === 'npm', encoding: 'utf8', timeout: 600000, maxBuffer: 50 * 1024 * 1024, ...opts });
 const log = (m) => console.error(`[evaluation] ${m}`);
 const tick = (ok) => (ok ? 'PASS' : '**FAIL**');
 const out = [];

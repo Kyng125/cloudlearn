@@ -1,12 +1,12 @@
 # CloudLearn evaluation results
 
-Generated 2026-10-30T23:26:12.198Z on Node v22.23.4, 2 CPU(s), linux. Re-create with `node tests/run-evaluation.js`.
+Generated 2026-10-31T05:27:57.672Z on Node v22.23.4, 2 CPU(s), linux. Re-create with `node tests/run-evaluation.js`.
 
 **Overall: all checks passed**
 
 ## 1. Backend automated tests (API, security, data rules)
 
-139 of 139 passed (0 failed). Includes the access-control matrix: every API route called by 7 kinds of caller (anonymous, enrolled student, peer student, non-enrolled student, owning instructor, other instructor, admin).
+146 of 146 passed (0 failed). Includes the access-control matrix: every API route called by 7 kinds of caller (anonymous, enrolled student, peer student, non-enrolled student, owning instructor, other instructor, admin).
 
 ## 2. Functional test cases TC01-TC13 (real browser, real server and database)
 
@@ -68,17 +68,17 @@ Generated 2026-10-30T23:26:12.198Z on Node v22.23.4, 2 CPU(s), linux. Re-create 
 
 | Concurrent students | Requests | Duration (s) | Req/s | p50 (ms) | p95 (ms) | Max (ms) | Errors |
 |---|---|---|---|---|---|---|---|
-| 25 | 350 | 4.0 | 87 | 2 | 2060 | 2072 | 0 |
-| 50 | 700 | 5.9 | 118 | 3 | 3093 | 4199 | 0 |
-| 100 | 1400 | 10.5 | 133 | 48 | 6969 | 8621 | 0 |
+| 25 | 350 | 3.9 | 89 | 2 | 1968 | 1982 | 0 |
+| 50 | 700 | 6.0 | 117 | 7 | 2997 | 4121 | 0 |
+| 100 | 1400 | 10.2 | 138 | 10 | 6674 | 8313 | 0 |
 
 ### Existing students signing in and taking the quiz at the same moment
 
 | Concurrent students | Requests | Duration (s) | Req/s | p50 (ms) | p95 (ms) | Max (ms) | Errors |
 |---|---|---|---|---|---|---|---|
-| 25 | 325 | 3.8 | 86 | 5 | 913 | 2161 | 0 |
-| 50 | 650 | 6.0 | 109 | 8 | 3398 | 4375 | 0 |
-| 100 | 1300 | 9.9 | 131 | 7 | 7846 | 7881 | 0 |
+| 25 | 325 | 3.8 | 85 | 6 | 746 | 2155 | 0 |
+| 50 | 650 | 6.0 | 109 | 7 | 3138 | 4212 | 0 |
+| 100 | 1300 | 9.9 | 132 | 9 | 6997 | 8190 | 0 |
 
 Each student: sign in or register, list courses/assignments/quizzes/notifications, start a quiz attempt, save answers progressively, submit. Latency is dominated by password hashing (CPU-bound); all other endpoints stay well under a second at 100 concurrent students.
 
