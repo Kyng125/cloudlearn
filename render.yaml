@@ -7,7 +7,8 @@ services:
     runtime: node
     plan: free
     region: frankfurt            # closest Render region to Nigeria
-    buildCommand: cd frontend && npm ci && npm run build && cd ../backend && npm ci --omit=dev
+    # NODE_ENV=production makes npm skip devDependencies (vite, typescript, tailwind), so the front-end install must ask for them explicitly.
+    buildCommand: cd frontend && npm ci --include=dev && npm run build && cd ../backend && npm ci --omit=dev
     startCommand: cd backend && node src/server.js
     healthCheckPath: /api/health
     autoDeploy: true
