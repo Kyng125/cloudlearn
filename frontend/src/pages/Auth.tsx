@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../context';
+import { useDemo } from '../lib/useDemo';
 import { Button, Input, Field } from '../components/UI';
 
 const DEMO_ACCOUNTS = [
@@ -11,6 +12,7 @@ const DEMO_ACCOUNTS = [
 
 export function Login() {
   const { login, navigate } = useApp();
+  const demo = useDemo();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -67,7 +69,7 @@ export function Login() {
           <p className="text-[#6b7fa8] mb-8">Enter your credentials to access your account</p>
 
           {/* Demo accounts */}
-          <div className="mb-6 p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+          {demo && <div className="mb-6 p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
             <p className="text-xs font-semibold text-blue-400 mb-3 uppercase tracking-wider">Demo accounts (password: demo123) — click to fill</p>
             <div className="space-y-2">
               {DEMO_ACCOUNTS.map(d => (
@@ -78,7 +80,7 @@ export function Login() {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <Field label="Email address" required>

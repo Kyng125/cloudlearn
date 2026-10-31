@@ -63,7 +63,7 @@ function createApp(db, overrides = {}) {
   const validPw = (pw) => typeof pw === 'string' && pw.length >= 6 && pw.length <= 72;
 
   const startedAt = new Date().toISOString();
-  api.get('/health', (_req, res) => { db.prepare('SELECT 1').get(); res.json({ ok: true, ephemeral: !!config.ephemeral, startedAt }); });
+  api.get('/health', (_req, res) => { db.prepare('SELECT 1').get(); res.json({ ok: true, ephemeral: !!config.ephemeral, demo: !!db.prepare('SELECT 1 FROM users WHERE email = ?').get('student@cloudlearn.com'), startedAt }); });
 
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 

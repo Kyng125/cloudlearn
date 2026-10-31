@@ -51,3 +51,4 @@ If you need data to survive: a paid web service with a persistent disk mounted a
 - First load takes ~1 minute: the free service was asleep.
 - Everything reset: the service restarted or slept (see above).
 - `better-sqlite3` build error: keep `NODE_VERSION=22`.
+- `vite: not found` during build: Render sets `NODE_ENV=production` for the build, so `npm ci` skips devDependencies. The build command must be `cd frontend && npm ci --include=dev && npm run build && cd ../backend && npm ci --omit=dev` (already in render.yaml). If you created the service before this fix, edit Build Command in Render > Settings.

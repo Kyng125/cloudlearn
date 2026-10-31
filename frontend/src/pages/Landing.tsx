@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../context';
+import { useDemo } from '../lib/useDemo';
 import { api, errorMessage } from '../api';
 import type { Course } from '../types';
 import { PublicLayout } from '../components/Layout';
@@ -41,6 +42,7 @@ const FEATURES = [
 
 export function Landing() {
   const { navigate } = useApp();
+  const demo = useDemo();
   const { courses: published, loading, error } = usePublishedCourses();
   const STATS = [
     { label: 'Published Courses', value: loading ? '…' : String(published.length) },
@@ -68,7 +70,7 @@ export function Landing() {
             <Button size="lg" variant="secondary" onClick={() => navigate('courses')}>Browse Courses</Button>
           </div>
 
-          <div className="mt-10 p-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-xl inline-flex flex-col items-start gap-2 text-left mx-auto">
+          {demo && <div className="mt-10 p-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-xl inline-flex flex-col items-start gap-2 text-left mx-auto">
             <p className="text-xs text-[#4a5a7a] uppercase tracking-wider font-mono mb-1">Quick Demo Login</p>
             <div className="flex flex-wrap gap-3">
               {[
@@ -83,7 +85,7 @@ export function Landing() {
               ))}
             </div>
             <p className="text-xs text-[#4a5a7a]">Password: <span className="font-mono">demo123</span></p>
-          </div>
+          </div>}
         </div>
       </section>
 
