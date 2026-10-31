@@ -9,15 +9,21 @@ Render's free web services have an ephemeral filesystem. The database, uploaded 
 What CloudLearn does about it:
 - On every cold start it creates the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` (and demo data if `BOOTSTRAP_DEMO=1`), so the site is never an unusable empty shell.
 - The app shows a "demo hosting" notice to signed-in users.
-- Backups made in the admin screen live on the same wiped disk, so they do not protect you on this plan.
+- Backups made in the admin screen live on the same wiped disk, so they do not protect you on this plan **unless you download them**: Admin > Backup & Recovery > Download saves a .zip (database, uploaded files, manifest) to your computer.
 
 For the seminar demo:
 1. Set `BOOTSTRAP_DEMO=1` so the site starts with courses, a quiz, assignments and demo accounts, and sign in as the admin with your own password.
 2. Open the site a few minutes before presenting so it is awake (a cold start takes about a minute and the first page shows Render's loading screen).
-3. Anything created during the demo is gone after the next sleep. That is expected on this plan.
+3. Anything created during the demo is gone after the next sleep. To keep it: create a backup and Download it before you finish. After a reset, sign in with the ADMIN_EMAIL account, choose Upload backup, then Restore: the original accounts, courses, grades and files come back and everyone is signed out (sign in with the accounts from the backup, which may include the original admin password).
 4. 750 free instance hours per month are shared by the workspace; a service that is awake all month uses about 744.
 
 If you need data to survive: a paid web service with a persistent disk mounted at `/var/data` (set `DB_FILE=/var/data/cloudlearn.db`, `UPLOAD_DIR=/var/data/uploads`, `BACKUP_DIR=/var/data/backups`, remove `EPHEMERAL_STORAGE`). No code change is needed. Render's free Postgres expires after 30 days and would need the SQL ported, so it is not recommended here.
+
+## Keeping and moving data (backup download / upload)
+- Download: any backup row has a Download link (admin only). The zip contains `cloudlearn.db`, `manifest.json` and `uploads/`. It holds every user's password hash and all coursework, so store it privately.
+- Upload: only zips made by CloudLearn are accepted. The server checks file names, total unpacked size (zip-bomb guard), that the database is healthy and has this app's tables, and a size limit (100 MB, `maxBackupUploadBytes`). An uploaded backup appears in the list as type "uploaded" and changes nothing until you press Restore.
+- Large backups: downloads above 200 MB are refused (the zip is built in memory on a small free instance).
+- Restoring an older backup into a newer version of the app works as long as the tables match; after an app upgrade that changes the database, restore only backups taken since.
 
 ## Steps
 1. Push the repository to GitHub (`.env` and databases are git-ignored; never commit passwords).

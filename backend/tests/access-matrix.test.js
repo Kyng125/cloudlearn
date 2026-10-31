@@ -61,6 +61,7 @@ const M = [
   ['PATCH', '/api/admin/users/:stu5', ['admin'], { name: 'Renamed' }], ['DELETE', '/api/admin/users/:stu5', ['admin']],
   ['GET', '/api/admin/activity-logs', ['admin']],
   ['GET', '/api/admin/backups', ['admin']], ['POST', '/api/admin/backups', ['admin']],
+  ['GET', '/api/admin/backups/:backup/download', ['admin']], ['POST', '/api/admin/backups/upload', ['admin']],
   ['DELETE', '/api/admin/backups/:backup', ['admin']], ['POST', '/api/admin/backups/:backup/restore', ['admin'], { confirm: true }],
 ];
 

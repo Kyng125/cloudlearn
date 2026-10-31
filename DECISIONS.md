@@ -48,3 +48,5 @@
 | D45 | The admin account never shares the demo password: `ADMIN_PASSWORD` (10+ chars) is required in production for an empty database | DECIDED | Public URL |
 | D46 | No demo accounts by default in production (`BOOTSTRAP_DEMO=0`); owner may set 1 for presentations | CONFIRMED (owner: "as you plan") | |
 | D47 | CSP (self scripts; Google Fonts; https images), HSTS on secure deployments, Permissions-Policy, trust proxy = 1 hop | DECIDED | Verified with the crawl and TC01-13 in production mode |
+| D48 | Backups can be downloaded as a .zip and uploaded back (admin only). Upload validates names (flat generated upload names only), total unpacked size (600 MB) before inflating, SQLite integrity and table set, 100 MB upload cap; it never restores by itself | DECIDED (owner requested) | Lets data survive Render free-plan resets (D44) |
+| D49 | `fflate` (pure JS, zero dependencies) used for zip; chosen over zip libraries with a history of path-traversal bugs | DECIDED | npm audit: 0 vulnerabilities |

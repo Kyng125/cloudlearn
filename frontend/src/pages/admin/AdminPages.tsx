@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../context';
 import { DashboardLayout } from '../../components/Layout';
 import { Card, Button, Badge, Avatar, SearchInput, SectionHeader, StatCard, Tabs, Field, Input, Textarea, Spinner, EmptyState, ConfirmDialog } from '../../components/UI';
@@ -319,6 +319,12 @@ export function BackupRecovery() {
       await logout();
     } catch (e) { addToast(errorMessage(e), 'error'); setRestoreTarget(null); } finally { setBusy(false); }
   };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    try { await api.upload('/admin/backups/upload', file); addToast('Backup uploaded. Choose Restore to use it.'); await load(); } catch (e) { addToast(errorMessage(e), 'error'); } finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
   const remove = async () => {
     if (!deleteTarget) return;
     try { await api.del(`/admin/backups/${deleteTarget.name}`); addToast('Backup deleted'); await load(); } catch (e) { addToast(errorMessage(e), 'error'); }
@@ -331,7 +337,12 @@ export function BackupRecovery() {
   return (
     <DashboardLayout>
       <SectionHeader title="Backup & Recovery" description="Snapshots of the database and uploaded files"
-        action={<Button onClick={create} disabled={busy}>{busy ? 'Working…' : '+ Create backup'}</Button>} />
+        action={<div className="flex flex-wrap gap-2">
+          <input ref={fileRef} type="file" accept=".zip,application/zip" aria-label="Backup file to upload" className="hidden" onChange={e => upload(e.target.files?.[0])} />
+          <Button variant="secondary" onClick={() => fileRef.current?.click()} disabled={busy}>Upload backup</Button>
+          <Button onClick={create} disabled={busy}>{busy ? 'Working…' : '+ Create backup'}</Button>
+        </div>} />
+      <p className="text-sm text-[#6b7fa8] mb-4">Download a backup to keep a copy outside the server. After a reset, sign in, choose Upload backup, then Restore. Restoring signs everyone out and brings back the accounts that were in the backup.</p>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <StatCard label="Last Backup" value={latest ? new Date(latest.createdAt).toLocaleDateString() : 'None'} icon="💾" color="green" sub={latest ? new Date(latest.createdAt).toLocaleTimeString() : 'Create one now'} />
@@ -359,12 +370,13 @@ export function BackupRecovery() {
                 {backups.map(b => (
                   <tr key={b.name} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
                     <td className="px-4 py-3 font-mono text-xs text-[#a0b4d0]">{new Date(b.createdAt).toLocaleString()}</td>
-                    <td className="px-4 py-3"><Badge variant={b.kind === 'manual' ? 'blue' : 'gray'}>{b.kind === 'pre-restore' ? 'Safety (pre-restore)' : b.kind}</Badge></td>
+                    <td className="px-4 py-3"><Badge variant={b.kind === 'manual' || b.kind === 'uploaded' ? 'blue' : 'gray'}>{b.kind === 'pre-restore' ? 'Safety (pre-restore)' : b.kind}</Badge></td>
                     <td className="px-4 py-3 text-[#a0b4d0]">{fmtBytes(b.sizeBytes)}</td>
                     <td className="px-4 py-3 text-[#6b7fa8]">{b.users}</td>
                     <td className="px-4 py-3 text-[#6b7fa8]">{b.courses}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
+                        <a href={`/api/admin/backups/${b.name}/download`} download className="inline-flex items-center px-2 py-1 text-xs rounded-md text-blue-400 hover:text-blue-300 hover:bg-[rgba(255,255,255,0.05)]">Download</a>
                         <Button size="xs" variant="ghost" disabled={busy} onClick={() => setRestoreTarget(b)}>Restore</Button>
                         <Button size="xs" variant="ghost" disabled={busy} onClick={() => setDeleteTarget(b)}>Delete</Button>
                       </div>

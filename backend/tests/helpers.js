@@ -12,6 +12,7 @@ async function start(opts = {}) {
   const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-bk-'));
   const app = createApp(db, { ...TEST_CONFIG, uploadDir, backupDir, ...(opts.config || {}) });
   const server = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  server.keepAliveTimeout = 65000; server.headersTimeout = 66000; // same as production (server.js)
   server.unref(); // a failing assertion must not leave the process hanging on an open server
   const base = `http://127.0.0.1:${server.address().port}`;
   return { db, base, uploadDir, backupDir, close: () => new Promise((r) => { server.closeAllConnections(); server.close(r); }) };

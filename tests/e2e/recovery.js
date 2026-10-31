@@ -74,6 +74,24 @@ const api = async (method, p, body, cookie) => { const r = await fetch(BASE + p,
     const me = await api('GET', '/api/auth/me', null, l.cookie); if (me.status !== 200) throw new Error('session lost after restart: ' + me.status);
     if (sql("select count(*) c from users")[0].c < 8) throw new Error('users missing');
   });
+  await step('R10 free-host reset: download a backup, lose everything, upload it into the empty server, restore', async () => {
+    await fresh(b, vp); await signIn('admin@cloudlearn.com'); await go('Backup');
+    await page.getByRole('button', { name: '+ Create backup' }).click(); await toast('Backup created');
+    const [dlEvent] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Download' }).first().click()]);
+    const zipPath = path.join(dir, 'downloaded.zip'); await dlEvent.saveAs(zipPath);
+    if (!/^backup-.*\.zip$/.test(dlEvent.suggestedFilename()) || fs.statSync(zipPath).size < 1000) throw new Error('bad download: ' + dlEvent.suggestedFilename());
+    // the host sleeps: everything on disk disappears, the server comes back with only a freshly created admin
+    await stopServer(); fs.rmSync(env.DB_FILE, { force: true }); fs.rmSync(env.DB_FILE + '-wal', { force: true }); fs.rmSync(env.DB_FILE + '-shm', { force: true }); fs.rmSync(env.UPLOAD_DIR, { recursive: true, force: true }); fs.rmSync(env.BACKUP_DIR, { recursive: true, force: true });
+    env.ADMIN_EMAIL = 'fresh@admin.com'; env.ADMIN_PASSWORD = 'fresh-admin-pass'; await startServer();
+    if (sql('select count(*) c from courses')[0].c !== 0) throw new Error('server was not empty after the wipe');
+    await fresh(b, vp); await signIn('fresh@admin.com', 'fresh-admin-pass'); await go('Backup');
+    await page.locator('input[type=file]').setInputFiles(zipPath); await toast('Backup uploaded');
+    await page.getByRole('button', { name: 'Restore' }).first().click(); await page.getByRole('button', { name: /Restore and sign everyone out/ }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).first().waitFor();
+    if (sql('select count(*) c from courses')[0].c < 4) throw new Error('courses did not come back');
+    if (!fs.existsSync(path.join(env.UPLOAD_DIR, 'before-backup.bin')) && !fs.existsSync(env.UPLOAD_DIR)) throw new Error('uploads folder missing');
+    await signIn('admin@cloudlearn.com'); // the original admin works again
+  });
   console.log(results.map(([n, r]) => `${r.startsWith('PASS') ? 'PASS' : 'FAIL'} ${n}${r.startsWith('PASS') ? '' : ' :: ' + r.slice(5)}`).join('\n'));
   await b.close(); await stopServer(); process.exit(results.some(r => r[1] !== 'PASS') ? 1 : 0);
 })().catch(async e => { console.log('CRASH', e.message); await stopServer(); process.exit(2); });

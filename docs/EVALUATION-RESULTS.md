@@ -1,12 +1,12 @@
 # CloudLearn evaluation results
 
-Generated 2026-10-31T05:27:57.672Z on Node v22.23.4, 2 CPU(s), linux. Re-create with `node tests/run-evaluation.js`.
+Generated 2026-10-31T11:34:05.920Z on Node v22.23.4, 2 CPU(s), linux. Re-create with `node tests/run-evaluation.js`.
 
 **Overall: all checks passed**
 
 ## 1. Backend automated tests (API, security, data rules)
 
-146 of 146 passed (0 failed). Includes the access-control matrix: every API route called by 7 kinds of caller (anonymous, enrolled student, peer student, non-enrolled student, owning instructor, other instructor, admin).
+153 of 153 passed (0 failed). Includes the access-control matrix: every API route called by 7 kinds of caller (anonymous, enrolled student, peer student, non-enrolled student, owning instructor, other instructor, admin).
 
 ## 2. Functional test cases TC01-TC13 (real browser, real server and database)
 
@@ -61,6 +61,7 @@ Generated 2026-10-31T05:27:57.672Z on Node v22.23.4, 2 CPU(s), linux. Re-create 
 | R7 a corrupted backup is refused and current data is untouched | PASS | PASS |
 | R8 missing uploads folder: downloads fail cleanly, uploads work again, server stays up | PASS | PASS |
 | R9 server restart: data and signed-in sessions survive | PASS | PASS |
+| R10 free-host reset: download a backup, lose everything, upload it into the empty server, restore | PASS | PASS |
 
 ## 6. Load (concurrent students taking a timed quiz; bcrypt cost 10, single Node process, SQLite)
 
@@ -68,17 +69,17 @@ Generated 2026-10-31T05:27:57.672Z on Node v22.23.4, 2 CPU(s), linux. Re-create 
 
 | Concurrent students | Requests | Duration (s) | Req/s | p50 (ms) | p95 (ms) | Max (ms) | Errors |
 |---|---|---|---|---|---|---|---|
-| 25 | 350 | 3.9 | 89 | 2 | 1968 | 1982 | 0 |
-| 50 | 700 | 6.0 | 117 | 7 | 2997 | 4121 | 0 |
-| 100 | 1400 | 10.2 | 138 | 10 | 6674 | 8313 | 0 |
+| 25 | 350 | 4.1 | 85 | 4 | 1573 | 2452 | 0 |
+| 50 | 700 | 6.5 | 107 | 9 | 3299 | 4627 | 0 |
+| 100 | 1400 | 11.1 | 126 | 10 | 8718 | 8771 | 0 |
 
 ### Existing students signing in and taking the quiz at the same moment
 
 | Concurrent students | Requests | Duration (s) | Req/s | p50 (ms) | p95 (ms) | Max (ms) | Errors |
 |---|---|---|---|---|---|---|---|
-| 25 | 325 | 3.8 | 85 | 6 | 746 | 2155 | 0 |
-| 50 | 650 | 6.0 | 109 | 7 | 3138 | 4212 | 0 |
-| 100 | 1300 | 9.9 | 132 | 9 | 6997 | 8190 | 0 |
+| 25 | 325 | 4.3 | 75 | 6 | 943 | 2371 | 0 |
+| 50 | 650 | 6.2 | 104 | 7 | 3396 | 4587 | 0 |
+| 100 | 1300 | 10.6 | 123 | 13 | 7477 | 8824 | 0 |
 
 Each student: sign in or register, list courses/assignments/quizzes/notifications, start a quiz attempt, save answers progressively, submit. Latency is dominated by password hashing (CPU-bound); all other endpoints stay well under a second at 100 concurrent students.
 
